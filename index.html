@@ -1,0 +1,2766 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B101B" id="metaThemeColor" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Labirinto Sombrio: Eclipse — Arcade Assimétrico PWA</title>
+
+  <!-- Favicon e Ícone Web App -->
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PeerJS para Multiplayer P2P sem servidor -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- Fontes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-app: #0B101B;
+      --bg-panel: rgba(17, 25, 42, 0.86);
+      --border-panel: rgba(56, 189, 248, 0.24);
+      --accent-primary: #F59E0B;
+      --accent-secondary: #38BDF8;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+    }
+
+    .font-display {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* Glassmorphism painel tátil */
+    .glass-panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-panel);
+      box-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.65);
+    }
+
+    /* Scrollbar discreta dentro de modais */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+    }
+
+    /* Botão tátil */
+    .btn-tactile {
+      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, background-color 0.18s ease;
+    }
+    .btn-tactile:active {
+      transform: scale(0.96);
+    }
+
+    /* Canvas sem borrão */
+    #gameCanvas {
+      display: block;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between">
+
+  <!-- TOAST / MENSAGEM FLUTUANTE (Substitui alert()) -->
+  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none flex flex-col items-center gap-2 w-[92%] max-w-md"></div>
+
+  <!-- BARRA SUPERIOR FIXA -->
+  <header class="w-full px-3 sm:px-5 py-2.5 flex items-center justify-between border-b border-white/10 bg-black/25 backdrop-blur-md z-30 shrink-0">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+        <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2a10 10 0 1 0 7.07 17.07L12 12l7.07-7.07A9.97 9.97 0 0 0 12 2zm1 3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="font-display font-bold text-sm sm:text-base tracking-tight leading-none">LABIRINTO SOMBRIO</h1>
+        <span class="text-[10px] sm:text-xs font-semibold tracking-widest uppercase text-amber-400">Edição Eclipse • PWA</span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2">
+      <!-- Como Jogar / Tutorial Rápido -->
+      <button id="btnHowToPlay" title="Como Jogar & Regras do Jogo" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 text-xs font-semibold text-amber-300 flex items-center gap-1.5 shadow-sm">
+        <span>📖</span>
+        <span class="hidden sm:inline">Como Jogar</span>
+      </button>
+
+      <!-- Seletor Rápido de Tema -->
+      <button id="btnCycleTheme" title="Alternar Tema Visual" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium flex items-center gap-1.5">
+        <span id="themeDot" class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+        <span id="themeLabel" class="hidden sm:inline">Bioluminescente</span>
+        <span class="sm:hidden">Tema</span>
+      </button>
+
+      <!-- Áudio -->
+      <button id="btnToggleAudio" title="Som On/Off" class="btn-tactile p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200">
+        <svg id="iconSoundOn" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <svg id="iconSoundOff" class="w-4 h-4 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+        </svg>
+      </button>
+
+      <!-- Instalar PWA / Info -->
+      <button id="btnInstallPwa" title="Instalar como App PWA" class="btn-tactile p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sky-400">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+      </button>
+
+      <!-- Perfil Local -->
+      <button id="btnOpenProfile" class="btn-tactile flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 border border-white/15">
+        <img id="headerAvatar" src="" alt="Avatar" class="w-7 h-7 rounded-full object-cover bg-slate-800 border border-amber-400/50" />
+        <span id="headerNickname" class="text-xs font-semibold max-w-[84px] truncate">Jogador</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ÁREA CENTRAL DINÂMICA -->
+  <main class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
+
+    <!-- ==================== TELA 1: LOBBY PRINCIPAL ==================== -->
+    <section id="lobbyView" class="w-full h-full overflow-y-auto custom-scroll px-4 py-5 flex flex-col items-center justify-start sm:justify-center">
+      <div class="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+
+        <!-- Coluna Esquerda: Modos Solo -->
+        <div class="lg:col-span-7 glass-panel rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                Campanha 50 Fases
+              </span>
+              <span class="text-xs text-slate-400">Recorde: <strong id="highScoreDisplay" class="text-amber-400">0</strong> • Progresso: <strong id="stageProgressDisplay" class="text-emerald-400">1/50</strong></span>
+            </div>
+            <h2 class="font-display text-2xl sm:text-3xl font-bold text-white leading-tight">
+              Cace ou Sobreviva no Labirinto
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+              Explore <strong>50 labirintos únicos</strong> com mecânicas especiais: Breu Total, Piso Congelado, Sobrecarga, Túneis Duplos e Chuva de Relíquias.
+            </p>
+          </div>
+
+          <!-- Seletor de Fase (1 a 50) -->
+          <div class="bg-black/30 rounded-2xl p-3 border border-white/10">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-amber-300">Fase Selecionada:</span>
+                <span id="selectedStageBadge" class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/30 text-xs font-extrabold text-amber-200">#1</span>
+              </div>
+              <button id="btnOpenStageGrid" type="button" class="btn-tactile text-xs font-semibold text-sky-400 hover:text-sky-300 underline">
+                Ver Todas as 50 Fases
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button id="btnPrevStage" type="button" class="btn-tactile px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 font-bold text-xs text-white">◀</button>
+              <div class="flex-1 bg-slate-950/70 border border-white/10 rounded-xl px-3 py-2 flex items-center justify-between">
+                <div>
+                  <div id="stageTitleLabel" class="text-xs font-bold text-white">01. Portal de Ardósia</div>
+                  <div id="stageModifierLabel" class="text-[11px] text-sky-300">✦ Clássico • 3 Espectros</div>
+                </div>
+                <span id="stageStatusIcon" class="text-sm">🔓</span>
+              </div>
+              <button id="btnNextStage" type="button" class="btn-tactile px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 font-bold text-xs text-white">▶</button>
+            </div>
+          </div>
+
+          <!-- Seletor de Dificuldade Bot -->
+          <div class="bg-black/30 rounded-2xl p-3 border border-white/5">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-300">Inteligência dos Bots (Solo)</span>
+              <span id="diffDesc" class="text-[11px] text-sky-400 font-medium">Perseguição + Emboscada</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2" id="difficultySelector">
+              <button data-diff="casual" class="diff-btn py-2 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">Casual</button>
+              <button data-diff="tatico" class="diff-btn py-2 rounded-xl text-xs font-bold border border-sky-400/50 bg-sky-500/20 text-sky-200">Tático</button>
+              <button data-diff="implacavel" class="diff-btn py-2 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10">Implacável</button>
+            </div>
+          </div>
+
+          <!-- Botões Jogar Solo -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button id="btnStartSoloOrbe" class="btn-tactile group relative overflow-hidden rounded-2xl p-4 text-left bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/20">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-extrabold uppercase tracking-wider bg-black/15 px-2 py-0.5 rounded-md">Solo • Clássico</span>
+                <span class="text-xl">🟡</span>
+              </div>
+              <div class="font-display font-bold text-lg">Jogar como Orbe</div>
+              <p class="text-xs font-medium text-slate-900/85 mt-0.5">Habilidade: <strong>Impulso Veloz</strong></p>
+            </button>
+
+            <button id="btnStartSoloEspectro" class="btn-tactile group relative overflow-hidden rounded-2xl p-4 text-left bg-gradient-to-br from-rose-600 to-indigo-700 text-white shadow-lg shadow-rose-600/20 border border-rose-400/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-extrabold uppercase tracking-wider bg-black/25 px-2 py-0.5 rounded-md">Solo • Caçador</span>
+                <span class="text-xl">👻</span>
+              </div>
+              <div class="font-display font-bold text-lg">Jogar como Espectro</div>
+              <p class="text-xs font-medium text-rose-100/85 mt-0.5">Habilidade: <strong>Atravessar Parede</strong></p>
+            </button>
+          </div>
+
+          <!-- Seletor de Temas Visuais -->
+          <div>
+            <span class="text-xs font-semibold text-slate-400 block mb-2">Estilo Visual do Labirinto</span>
+            <div class="grid grid-cols-3 gap-2" id="themeCards">
+              <button data-theme="biolum" class="theme-card p-2.5 rounded-2xl border-2 border-sky-400 bg-sky-950/40 text-left transition">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <span class="w-3 h-3 rounded-full bg-sky-400 shadow shadow-sky-400"></span>
+                  <span class="text-xs font-bold text-white truncate">Biolum</span>
+                </div>
+                <p class="text-[10px] text-slate-300 leading-tight">Vidro fosco & blueprint</p>
+              </button>
+
+              <button data-theme="zen" class="theme-card p-2.5 rounded-2xl border border-white/10 bg-stone-900/60 text-left transition hover:border-amber-300/40">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <span class="w-3 h-3 rounded-full bg-amber-300"></span>
+                  <span class="text-xs font-bold text-stone-100 truncate">Jardim Zen</span>
+                </div>
+                <p class="text-[10px] text-stone-400 leading-tight">Papel washi & lanternas</p>
+              </button>
+
+              <button data-theme="arcade" class="theme-card p-2.5 rounded-2xl border border-white/10 bg-indigo-950/60 text-left transition hover:border-fuchsia-400/40">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <span class="w-3 h-3 rounded-full bg-fuchsia-400"></span>
+                  <span class="text-xs font-bold text-indigo-100 truncate">Cristal 84</span>
+                </div>
+                <p class="text-[10px] text-indigo-300 leading-tight">Vetor retrô alto contraste</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna Direita: Duelo Multiplayer 1v1 -->
+        <div class="lg:col-span-5 glass-panel rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Duelo Online 1v1 (P2P)</span>
+            </div>
+            <h3 class="font-display text-xl font-bold text-white">Desafiar um Amigo</h3>
+            <p class="text-xs text-slate-300 mt-1">
+              Crie uma sala instantânea sem cadastro em servidor e envie o código ou link direto.
+            </p>
+          </div>
+
+          <!-- Estado Inicial Multiplayer -->
+          <div id="mpIdleBox" class="flex flex-col gap-3">
+            <!-- Opções da Sala antes de criar -->
+            <div class="bg-black/30 rounded-2xl p-3 border border-white/5 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-300 font-medium">Seu papel inicial:</span>
+                <select id="mpHostRoleSelect" class="bg-slate-900 border border-white/15 rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-300 focus:outline-none">
+                  <option value="orbe">🟡 Você: Orbe | Amigo: Espectro</option>
+                  <option value="espectro">👻 Você: Espectro | Amigo: Orbe</option>
+                </select>
+              </div>
+              <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-xs text-slate-300">Melhor de 3 (troca papéis)</span>
+                <input id="mpBestOf3" type="checkbox" checked class="w-4 h-4 accent-amber-500 rounded" />
+              </label>
+            </div>
+
+            <button id="btnCreateRoom" class="btn-tactile w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
+              Criar Sala e Gerar Código
+            </button>
+
+            <div class="relative flex py-1 items-center">
+              <div class="flex-grow border-t border-white/10"></div>
+              <span class="flex-shrink mx-3 text-[11px] uppercase tracking-wider text-slate-400">ou entrar com código</span>
+              <div class="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <div class="flex gap-2">
+              <input id="inputRoomCode" type="text" maxlength="4" placeholder="EX: A7K9" class="w-full uppercase tracking-[0.25em] text-center font-display font-bold text-base bg-black/40 border border-white/15 rounded-2xl px-3 py-2.5 text-white placeholder:text-slate-500 placeholder:tracking-normal focus:outline-none focus:border-sky-400" />
+              <button id="btnJoinRoom" class="btn-tactile px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 font-bold text-sm text-white shrink-0">
+                Entrar
+              </button>
+            </div>
+          </div>
+
+          <!-- Estado Sala Criada / Conectada -->
+          <div id="mpActiveBox" class="hidden flex-col gap-3 bg-black/35 rounded-2xl p-4 border border-sky-400/30">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-sky-300">Código da Sala</span>
+              <button id="btnCloseRoom" class="text-xs text-rose-400 hover:underline">Cancelar</button>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-950/80 border border-white/10 rounded-xl px-3.5 py-2.5">
+              <span id="roomCodeDisplay" class="font-display font-bold text-2xl tracking-[0.25em] text-amber-400">----</span>
+              <div class="flex gap-1.5">
+                <button id="btnCopyCode" class="btn-tactile px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold text-white">
+                  Copiar
+                </button>
+                <button id="btnShareLink" class="btn-tactile px-2.5 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-xs font-semibold text-sky-300">
+                  Link
+                </button>
+              </div>
+            </div>
+
+            <!-- Jogadores na Sala -->
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div class="bg-white/5 rounded-xl p-2.5 flex items-center gap-2 border border-white/10">
+                <img id="mpHostAvatar" src="" class="w-8 h-8 rounded-full object-cover bg-slate-800" />
+                <div class="overflow-hidden">
+                  <div id="mpHostName" class="text-xs font-bold truncate">Você</div>
+                  <div id="mpHostRoleBadge" class="text-[10px] text-amber-400 font-semibold">Orbe</div>
+                </div>
+              </div>
+
+              <div class="bg-white/5 rounded-xl p-2.5 flex items-center gap-2 border border-dashed border-white/15">
+                <img id="mpGuestAvatar" src="" class="w-8 h-8 rounded-full object-cover bg-slate-800 hidden" />
+                <div id="mpGuestPlaceholder" class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs text-slate-400 animate-pulse">?</div>
+                <div class="overflow-hidden">
+                  <div id="mpGuestName" class="text-xs font-semibold text-slate-400 truncate">Aguardando...</div>
+                  <div id="mpGuestRoleBadge" class="text-[10px] text-rose-400 font-semibold">Espectro</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Botão de Simulação para ambientes sandboxed (Canvas) ou teste local -->
+            <button id="btnSimulateGuest" type="button" class="hidden btn-tactile w-full py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-200 font-semibold text-xs">
+              🤖 Simular Oponente Entrando (Modo Sandbox)
+            </button>
+
+            <button id="btnStartMpMatch" disabled class="btn-tactile w-full py-3 rounded-xl bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-extrabold text-sm transition">
+              Aguardando Oponente Entrar...
+            </button>
+          </div>
+
+          <!-- Dica de Controles -->
+          <div class="text-[11px] text-slate-400 bg-white/5 rounded-xl px-3 py-2 flex items-center justify-between">
+            <span>🎮 <strong>PC:</strong> Setas/WASD + Espaço</span>
+            <span>📱 <strong>Celular:</strong> Deslize ou D-Pad</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TELA 2: ARENA DE JOGO ==================== -->
+    <section id="gameView" class="hidden w-full h-full flex flex-col items-center justify-between px-2 sm:px-4 py-2">
+
+      <!-- HUD Superior da Partida -->
+      <div class="w-full max-w-2xl flex items-center justify-between gap-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl px-3 py-1.5 shrink-0">
+        <!-- Info Jogador / Pontos -->
+        <div class="flex items-center gap-2.5">
+          <div class="relative">
+            <img id="hudPlayerAvatar" src="" class="w-8 h-8 rounded-full object-cover border border-amber-400" />
+            <span id="hudRoleIcon" class="absolute -bottom-1 -right-1 text-xs">🟡</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span id="hudRoleLabel" class="text-[11px] font-extrabold uppercase tracking-wider text-amber-400">ORBE</span>
+              <span id="hudRoundBadge" class="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-slate-300">R1</span>
+            </div>
+            <div class="font-display font-bold text-sm sm:text-base leading-none text-white">
+              <span id="hudScore">0</span> <span class="text-[10px] font-normal text-slate-400">PTS</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Central (Vidas + Eclipse Timer) -->
+        <div class="flex flex-col items-center">
+          <div id="hudLives" class="flex items-center gap-1 text-sm">❤️❤️❤️</div>
+          <div id="hudEclipseBarWrap" class="hidden w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+            <div id="hudEclipseBar" class="h-full bg-sky-400 w-full transition-all duration-75"></div>
+          </div>
+          <span id="hudStatusText" class="text-[10px] font-semibold text-slate-300 mt-0.5">Colete os cristais</span>
+        </div>
+
+        <!-- Botões Ação HUD -->
+        <div class="flex items-center gap-1.5">
+          <button id="btnPauseMatch" title="Pausar Partida (Tecla P ou Esc)" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200">
+            ⏸️
+          </button>
+          <button id="btnToggleDpad" title="Mostrar/Ocultar Controles na Tela" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200">
+            🕹️
+          </button>
+          <button id="btnQuitMatch" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-bold text-rose-300">
+            Sair
+          </button>
+        </div>
+      </div>
+
+      <!-- Container Responsivo do Canvas -->
+      <div id="canvasContainer" class="relative flex-1 w-full max-w-2xl my-1.5 flex items-center justify-center overflow-hidden">
+        <canvas id="gameCanvas" class="rounded-2xl shadow-2xl border border-white/10"></canvas>
+
+        <!-- Overlay de Contagem / Fim de Rodada -->
+        <div id="arenaOverlay" class="hidden absolute inset-0 bg-slate-950/75 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 text-center z-20">
+          <span id="overlayBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-400/30 mb-2">
+            Preparar
+          </span>
+          <h2 id="overlayTitle" class="font-display text-3xl sm:text-4xl font-bold text-white mb-2">3</h2>
+          <p id="overlaySubtitle" class="text-xs sm:text-sm text-slate-300 max-w-xs mb-5">
+            Deslize na tela ou use as setas para mover.
+          </p>
+          <div id="overlayActions" class="hidden flex flex-wrap items-center justify-center gap-3">
+            <button id="btnNextRoundStage" class="hidden btn-tactile px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm">
+              Próxima Fase ▶
+            </button>
+            <button id="btnPlayAgain" class="btn-tactile px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm">
+              Jogar Novamente
+            </button>
+            <button id="btnBackLobby" class="btn-tactile px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm">
+              Voltar ao Lobby
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra Inferior: Habilidade Especial + D-Pad Mobile -->
+      <div id="mobileControlsBar" class="w-full max-w-2xl flex items-center justify-between gap-3 pb-1 shrink-0">
+        <!-- D-Pad Aprimorado e Responsivo -->
+        <div id="onscreenDpad" class="grid grid-cols-3 gap-1.5 w-36 h-28 shrink-0">
+          <div></div>
+          <button data-dir="UP" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">▲</button>
+          <div></div>
+          <button data-dir="LEFT" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">◀</button>
+          <button data-dir="DOWN" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">▼</button>
+          <button data-dir="RIGHT" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">▶</button>
+        </div>
+
+        <!-- Botão de Habilidade Especial (Impulso / Fase Etérea) -->
+        <button id="btnSpecialAbility" class="btn-tactile flex-1 h-20 rounded-2xl bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-400/40 flex flex-col items-center justify-center px-4 relative overflow-hidden">
+          <div id="abilityCooldownFill" class="absolute inset-0 bg-amber-400/20 origin-left transition-transform duration-100" style="transform: scaleX(1);"></div>
+          <span id="abilityTitle" class="relative z-10 font-display font-bold text-sm sm:text-base text-white">⚡ IMPULSO VELOZ</span>
+          <span id="abilityStatus" class="relative z-10 text-[11px] font-semibold text-amber-300">PRONTO (ESPAÇO / TOQUE)</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== MODAL 1: ONBOARDING / PERFIL LOCAL ==================== -->
+  <div id="profileModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+    <div class="glass-panel w-full max-w-md rounded-3xl p-5 sm:p-6 my-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Identidade Local</span>
+          <h2 class="font-display text-xl font-bold text-white">Seu Perfil de Jogador</h2>
+        </div>
+        <button id="btnCloseProfileModal" class="hidden text-slate-400 hover:text-white p-1.5 rounded-lg bg-white/5">✕</button>
+      </div>
+
+      <!-- Prévia do Avatar Circular -->
+      <div class="flex flex-col items-center mb-4">
+        <div class="relative w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-amber-400 to-sky-400 shadow-lg">
+          <img id="profilePreviewImg" src="" alt="Preview" class="w-full h-full rounded-full object-cover bg-slate-900" />
+        </div>
+        <span class="text-[11px] text-slate-400 mt-1.5">Salvo localmente no seu dispositivo</span>
+      </div>
+
+      <!-- Nome / Apelido -->
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-slate-300 mb-1">Apelido na Arena</label>
+        <input id="inputNickname" type="text" maxlength="16" placeholder="Digite seu apelido..." class="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-amber-400" />
+      </div>
+
+      <!-- Opções de Foto: Câmera, Galeria ou Ícones -->
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button id="btnOpenCamera" type="button" class="btn-tactile py-2.5 px-3 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-xs font-bold text-sky-200 flex items-center justify-center gap-1.5">
+          📷 Usar Câmera
+        </button>
+        <label class="btn-tactile py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-bold text-white flex items-center justify-center gap-1.5 cursor-pointer">
+          🖼️ Foto da Galeria
+          <input id="inputGalleryFile" type="file" accept="image/*" class="hidden" />
+        </label>
+      </div>
+
+      <!-- Área da Câmera ao Vivo (oculta até clicar em Usar Câmera) -->
+      <div id="cameraBox" class="hidden mb-4 bg-black/60 rounded-2xl p-3 border border-sky-400/30 flex flex-col items-center gap-2">
+        <video id="cameraVideo" autoplay playsinline muted class="w-36 h-36 rounded-full object-cover border-2 border-sky-400 bg-slate-900"></video>
+        <div class="flex gap-2">
+          <button id="btnCapturePhoto" type="button" class="btn-tactile px-4 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">
+            Capturar Foto
+          </button>
+          <button id="btnCancelCamera" type="button" class="btn-tactile px-3 py-1.5 rounded-xl bg-white/10 text-slate-300 text-xs">
+            Fechar
+          </button>
+        </div>
+      </div>
+
+      <!-- Galeria de Ícones Embutidos -->
+      <div class="mb-5">
+        <span class="block text-xs font-semibold text-slate-300 mb-2">Ou escolha um emblema rápido:</span>
+        <div id="presetIconsGrid" class="grid grid-cols-6 gap-2"></div>
+      </div>
+
+      <div class="flex flex-col gap-2 mt-4">
+        <button id="btnQuickStartProfile" type="button" class="btn-tactile w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2">
+          <span>⚡ Jogar Agora (Entrar Direto)</span>
+        </button>
+        <button id="btnSaveProfile" type="button" class="btn-tactile w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs">
+          Salvar Perfil Personalizado
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2: PWA / INSTALAÇÃO ==================== -->
+  <div id="pwaModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md rounded-3xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-display text-lg font-bold text-white">Instalar App PWA</h3>
+        <button id="btnClosePwaModal" class="text-slate-400 hover:text-white p-1.5 rounded-lg bg-white/5">✕</button>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed mb-4">
+        O <strong>Labirinto Sombrio: Eclipse</strong> foi estruturado como Progressive Web App (PWA) com suporte offline para partidas Solo e armazenamento local.
+      </p>
+      <div class="space-y-2.5 text-xs text-slate-300 bg-black/35 p-3.5 rounded-2xl border border-white/10 mb-4">
+        <div>📱 <strong>Android / Chrome:</strong> Toque no menu (⋮) e selecione <em>"Instalar aplicativo"</em> ou <em>"Adicionar à tela inicial"</em>.</div>
+        <div>🍎 <strong>iPhone / Safari:</strong> Toque em <em>Compartilhar</em> e escolha <em>"Adicionar à Tela de Início"</em>.</div>
+      </div>
+      <button id="btnTriggerNativeInstall" class="hidden btn-tactile w-full py-3 rounded-xl bg-sky-500 text-slate-950 font-extrabold text-sm mb-2">
+        Instalar Agora no Dispositivo
+      </button>
+      <button id="btnClosePwaModal2" class="btn-tactile w-full py-2.5 rounded-xl bg-white/10 text-white font-semibold text-xs">
+        Entendi
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 3: MAPA DAS 50 FASES ==================== -->
+  <div id="stageSelectModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-2xl max-h-[85dvh] rounded-3xl p-5 sm:p-6 flex flex-col">
+      <div class="flex items-center justify-between mb-3 shrink-0">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Campanha Completa</span>
+          <h3 class="font-display text-xl font-bold text-white">Selecione uma das 50 Fases</h3>
+        </div>
+        <button id="btnCloseStageModal" class="text-slate-400 hover:text-white p-2 rounded-xl bg-white/5">✕</button>
+      </div>
+      <div class="text-xs text-slate-300 mb-3 shrink-0 flex flex-wrap gap-2">
+        <span class="px-2 py-0.5 rounded bg-white/5">✦ Clássico</span>
+        <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-200">🌑 Breu Total</span>
+        <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-200">❄️ Gelo</span>
+        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-200">⚡ Sobrecarga</span>
+        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-200">💎 Relíquias</span>
+        <span class="px-2 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-200">🌀 Túneis Duplos</span>
+      </div>
+      <div id="stagesGridContainer" class="flex-1 overflow-y-auto custom-scroll grid grid-cols-2 sm:grid-cols-5 gap-2 pr-1"></div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 4: COMO JOGAR / GUIA RÁPIDO ==================== -->
+  <div id="howToPlayModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-5 sm:p-6 my-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📖</span>
+          <h3 class="font-display text-xl font-bold text-white">Como Jogar</h3>
+        </div>
+        <button id="btnCloseHowToPlay" class="text-slate-400 hover:text-white p-2 rounded-xl bg-white/5">✕</button>
+      </div>
+
+      <div class="space-y-3 custom-scroll max-h-[70dvh] overflow-y-auto pr-1">
+        <!-- Card 1: Objetivo Principal -->
+        <div class="bg-black/35 rounded-2xl p-3.5 border border-white/10">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-base">🟡</span>
+            <h4 class="font-bold text-sm text-amber-300">Papel do Orbe (Sobrevivência)</h4>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Seu objetivo é coletar todos os <strong>cristais</strong> do labirinto sem ser tocado pelos Espectros. Ao limpar o labirinto, você vence a fase!
+          </p>
+          <div class="mt-2 text-[11px] text-amber-200/90 bg-amber-500/10 rounded-xl px-2.5 py-1.5 border border-amber-500/20">
+            ⚡ <strong>Habilidade:</strong> Pressione <kbd class="px-1.5 py-0.5 rounded bg-black/40 border border-white/20 font-mono">ESPAÇO</kbd> ou toque no botão para ganhar um <strong>Impulso Veloz</strong> temporário!
+          </div>
+        </div>
+
+        <!-- Card 2: Espectros e Fase Etérea -->
+        <div class="bg-black/35 rounded-2xl p-3.5 border border-white/10">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-base">👻</span>
+            <h4 class="font-bold text-sm text-sky-300">Papel do Espectro (Caçador)</h4>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Seja caçador contra bots ou no 1v1 contra um amigo. Encurrale o Orbe antes que ele consuma os cristais!
+          </p>
+          <div class="mt-2 text-[11px] text-sky-200/90 bg-sky-500/10 rounded-xl px-2.5 py-1.5 border border-sky-500/20">
+            🌀 <strong>Habilidade:</strong> Ative a <strong>Fase Etérea</strong> para <strong>atravessar paredes</strong> e armar emboscadas letais!
+          </div>
+        </div>
+
+        <!-- Card 3: Modo Eclipse (Vingança) -->
+        <div class="bg-black/35 rounded-2xl p-3.5 border border-white/10">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-base">🌑</span>
+            <h4 class="font-bold text-sm text-emerald-300">Núcleos de Eclipse (Inversão)</h4>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Colete os <strong>grandes núcleos brilhantes</strong> nos cantos para ativar o <strong>Eclipse</strong>! Os Espectros ficam azuis e vulneráveis. Cace-os para ganhar <strong>150 pontos extras</strong> por fantasma!
+          </p>
+        </div>
+
+        <!-- Card 4: Controles -->
+        <div class="bg-black/35 rounded-2xl p-3.5 border border-white/10">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-base">🎮</span>
+            <h4 class="font-bold text-sm text-white">Controles Universais</h4>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
+            <div class="bg-white/5 rounded-xl p-2 border border-white/5">
+              <strong class="text-white block mb-0.5">🖥️ Teclado (PC):</strong>
+              Setas ou <span class="font-mono text-amber-300">W A S D</span> para mover.<br/>
+              <span class="font-mono text-amber-300">ESPAÇO</span> = Habilidade.<br/>
+              <span class="font-mono text-amber-300">P</span> ou <span class="font-mono text-amber-300">Esc</span> = Pausar / Retomar.
+            </div>
+            <div class="bg-white/5 rounded-xl p-2 border border-white/5">
+              <strong class="text-white block mb-0.5">📱 Celular / Tablet:</strong>
+              Deslize o dedo na tela (*swipe*) ou use o <strong>D-Pad digital</strong> com resposta tátil.<br/>
+              Toque no botão central para Habilidade.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btnCloseHowToPlay2" type="button" class="btn-tactile w-full mt-4 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/20">
+        Entendido, Vamos Jogar!
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 5: PAUSA DA PARTIDA ==================== -->
+  <div id="pauseModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center">
+      <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 mx-auto flex items-center justify-center text-2xl mb-3">
+        ⏸️
+      </div>
+      <h3 class="font-display text-2xl font-bold text-white mb-1">Jogo Pausado</h3>
+      <p class="text-xs text-slate-400 mb-5">Respire fundo antes de voltar ao labirinto.</p>
+
+      <div class="flex flex-col gap-2.5">
+        <button id="btnResumeMatch" class="btn-tactile w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20">
+          ▶ Retomar Partida
+        </button>
+        <button id="btnRestartMatch" class="btn-tactile w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/10">
+          🔄 Reiniciar Fase
+        </button>
+        <button id="btnQuitFromPause" class="btn-tactile w-full py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-xs border border-rose-500/30">
+          🚪 Sair para o Lobby
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * LABIRINTO SOMBRIO: ECLIPSE — ENGINE COMPLETA (SINGLE-FILE PWA)
+     * Arquitetura:
+     * 1. PWA Manifest & Service Worker dinâmicos
+     * 2. Sistema de Perfil Local (Câmera WebRTC, Upload com Crop Circular, Ícones)
+     * 3. Sintetizador de Áudio Procedural (Web Audio API)
+     * 4. Motor de Jogo Assimétrico 60FPS (Orbe vs. Espectro + IA Tática + Poderes)
+     * 5. Rede P2P Zero-Backend (PeerJS + Fallback Sandbox/BroadcastChannel)
+     * ============================================================================
+     */
+
+    const DIRS = {
+      NONE:  { x: 0,  y: 0,  name: 'NONE' },
+      UP:    { x: 0,  y: -1, name: 'UP' },
+      DOWN:  { x: 0,  y: 1,  name: 'DOWN' },
+      LEFT:  { x: -1, y: 0,  name: 'LEFT' },
+      RIGHT: { x: 1,  y: 0,  name: 'RIGHT' }
+    };
+
+    const HIGHSCORE_KEY = 'eclipse_maze_highscore_v1';
+    const PROFILE_KEY = 'eclipse_maze_profile_v1';
+
+    // --------------------------------------------------------------------------
+    // 1. UTILITÁRIOS DE UI (TOASTS E CLIPBOARD SEGURO)
+    // --------------------------------------------------------------------------
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const colors = {
+        info: 'bg-slate-900/95 border-sky-400/50 text-sky-100',
+        success: 'bg-emerald-950/95 border-emerald-400/50 text-emerald-100',
+        warn: 'bg-amber-950/95 border-amber-400/50 text-amber-100',
+        danger: 'bg-rose-950/95 border-rose-400/50 text-rose-100'
+      };
+      const el = document.createElement('div');
+      el.className = `px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-xl text-xs sm:text-sm font-semibold text-center transition-all duration-300 ${colors[type] || colors.info}`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-8px)';
+        setTimeout(() => el.remove(), 300);
+      }, 2600);
+    }
+
+    function copyTextFallback(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Copiado para a área de transferência!', 'success');
+      } catch (e) {
+        showToast('Não foi possível copiar automaticamente.', 'warn');
+      }
+      document.body.removeChild(ta);
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. PWA MANIFEST DINÂMICO & SERVICE WORKER OFFLINE
+    // --------------------------------------------------------------------------
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const btn = document.getElementById('btnTriggerNativeInstall');
+      if (btn) btn.classList.remove('hidden');
+    });
+
+    (function initPwaResources() {
+      try {
+        const manifest = {
+          name: 'Labirinto Sombrio: Eclipse',
+          short_name: 'Eclipse Maze',
+          start_url: './',
+          display: 'standalone',
+          background_color: '#0B101B',
+          theme_color: '#0B101B',
+          icons: [
+            { src: './icon.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+          ]
+        };
+        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+      } catch (e) {}
+
+      // Registro do Service Worker para suporte PWA offline
+      if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+    })();
+
+    // --------------------------------------------------------------------------
+    // 3. TEMAS VISUAIS (BIOLUMINESCENTE, JARDIM ZEN, CRISTAL 84)
+    // --------------------------------------------------------------------------
+    const THEMES = {
+      biolum: {
+        name: 'Bioluminescente',
+        dot: '#38BDF8',
+        appBg: '#0B101B',
+        canvasBg: '#080D17',
+        gridLine: 'rgba(56, 189, 248, 0.05)',
+        wallFill: 'rgba(14, 116, 144, 0.32)',
+        wallStroke: '#38BDF8',
+        pelletColor: '#FDE68A',
+        powerColor: '#38BDF8',
+        orbeColor: '#F59E0B',
+        frightenedColor: '#0EA5E9',
+        ghostColors: ['#F43F5E', '#A855F7', '#EC4899', '#14B8A6', '#F97316']
+      },
+      zen: {
+        name: 'Jardim Zen',
+        dot: '#FCD34D',
+        appBg: '#171412',
+        canvasBg: '#1C1917',
+        gridLine: 'rgba(251, 191, 36, 0.04)',
+        wallFill: 'rgba(68, 64, 60, 0.55)',
+        wallStroke: '#D6D3D1',
+        pelletColor: '#FCD34D',
+        powerColor: '#FB7185',
+        orbeColor: '#FBBF24',
+        frightenedColor: '#60A5FA',
+        ghostColors: ['#E11D48', '#8B5CF6', '#D97706', '#059669', '#DB2777']
+      },
+      arcade: {
+        name: 'Cristal 84',
+        dot: '#E879F9',
+        appBg: '#090514',
+        canvasBg: '#05020C',
+        gridLine: 'rgba(232, 121, 249, 0.07)',
+        wallFill: 'rgba(88, 28, 135, 0.35)',
+        wallStroke: '#E879F9',
+        pelletColor: '#FEF08A',
+        powerColor: '#22D3EE',
+        orbeColor: '#FACC15',
+        frightenedColor: '#3B82F6',
+        ghostColors: ['#EF4444', '#EC4899', '#06B6D4', '#F97316', '#84CC16']
+      }
+    };
+
+    const THEME_KEYS = ['biolum', 'zen', 'arcade'];
+    let currentThemeKey = 'biolum';
+
+    function applyTheme(key) {
+      if (!THEMES[key]) return;
+      currentThemeKey = key;
+      const t = THEMES[key];
+      document.documentElement.style.setProperty('--bg-app', t.appBg);
+      document.getElementById('metaThemeColor').setAttribute('content', t.appBg);
+      document.getElementById('themeDot').style.backgroundColor = t.dot;
+      document.getElementById('themeLabel').textContent = t.name;
+
+      document.querySelectorAll('.theme-card').forEach(card => {
+        const active = card.dataset.theme === key;
+        card.classList.toggle('border-2', active);
+        card.classList.toggle('border-sky-400', active);
+        card.classList.toggle('border', !active);
+        card.classList.toggle('border-white/10', !active);
+      });
+    }
+
+    document.getElementById('btnCycleTheme').addEventListener('click', () => {
+      const nextIdx = (THEME_KEYS.indexOf(currentThemeKey) + 1) % THEME_KEYS.length;
+      applyTheme(THEME_KEYS[nextIdx]);
+      showToast(`Tema: ${THEMES[THEME_KEYS[nextIdx]].name}`, 'info');
+    });
+
+    document.querySelectorAll('.theme-card').forEach(card => {
+      card.addEventListener('click', () => applyTheme(card.dataset.theme));
+    });
+
+    // --------------------------------------------------------------------------
+    // 4. SINTETIZADOR DE ÁUDIO PROCEDURAL (WEB AUDIO API)
+    // --------------------------------------------------------------------------
+    const sfx = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+      },
+      playTone(freq, type = 'sine', duration = 0.08, vol = 0.08, slideTo = null) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          if (slideTo) {
+            osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+          }
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      },
+      chomp() { this.playTone(320, 'triangle', 0.05, 0.05, 480); },
+      powerPellet() { this.playTone(300, 'sine', 0.35, 0.12, 880); },
+      ability() { this.playTone(520, 'sawtooth', 0.22, 0.08, 960); },
+      eatGhost() { this.playTone(220, 'square', 0.28, 0.1, 740); },
+      hit() { this.playTone(260, 'sawtooth', 0.38, 0.12, 75); },
+      win() {
+        this.playTone(523, 'triangle', 0.12, 0.1);
+        setTimeout(() => this.playTone(659, 'triangle', 0.12, 0.1), 110);
+        setTimeout(() => this.playTone(784, 'triangle', 0.25, 0.12), 220);
+      }
+    };
+
+    // --------------------------------------------------------------------------
+    // 5. PERFIL LOCAL (CÂMERA, GALERIA COM RECORTE CIRCULAR E EMBLEMAS)
+    // --------------------------------------------------------------------------
+    const PRESET_AVATARS = [
+      { bg: '#F59E0B', emoji: '⚡' },
+      { bg: '#38BDF8', emoji: '👻' },
+      { bg: '#10B981', emoji: '🐉' },
+      { bg: '#F43F5E', emoji: '🔥' },
+      { bg: '#8B5CF6', emoji: '🌙' },
+      { bg: '#EC4899', emoji: '🦊' }
+    ];
+
+    let userProfile = {
+      nickname: 'Explorador',
+      avatar: ''
+    };
+    let tempAvatarDataUrl = '';
+    let cameraStream = null;
+
+    function generatePresetAvatarDataUrl(preset) {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 128;
+      const g = c.getContext('2d');
+      g.fillStyle = preset.bg;
+      g.beginPath();
+      g.arc(64, 64, 64, 0, Math.PI * 2);
+      g.fill();
+      g.font = '62px sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(preset.emoji, 64, 68);
+      return c.toDataURL('image/png');
+    }
+
+    function cropImageToCircularAvatar(sourceEl, sw, sh) {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 128;
+      const g = c.getContext('2d');
+      const size = Math.min(sw, sh);
+      const sx = (sw - size) / 2;
+      const sy = (sh - size) / 2;
+      g.beginPath();
+      g.arc(64, 64, 64, 0, Math.PI * 2);
+      g.clip();
+      g.drawImage(sourceEl, sx, sy, size, size, 0, 0, 128, 128);
+      return c.toDataURL('image/jpeg', 0.85);
+    }
+
+    function loadProfile() {
+      try {
+        const raw = localStorage.getItem(PROFILE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.nickname && parsed.avatar) {
+            userProfile = parsed;
+            return true;
+          }
+        }
+      } catch (e) {}
+      userProfile.avatar = generatePresetAvatarDataUrl(PRESET_AVATARS[0]);
+      return false;
+    }
+
+    function applyProfileToUI() {
+      document.getElementById('headerAvatar').src = userProfile.avatar;
+      document.getElementById('headerNickname').textContent = userProfile.nickname;
+      document.getElementById('hudPlayerAvatar').src = userProfile.avatar;
+      document.getElementById('mpHostAvatar').src = userProfile.avatar;
+      document.getElementById('mpHostName').textContent = userProfile.nickname;
+    }
+
+    function stopCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+      document.getElementById('cameraBox').classList.add('hidden');
+    }
+
+    function openProfileModal(isFirstSetup = false) {
+      const modal = document.getElementById('profileModal');
+      document.getElementById('inputNickname').value = isFirstSetup ? '' : userProfile.nickname;
+      tempAvatarDataUrl = userProfile.avatar || generatePresetAvatarDataUrl(PRESET_AVATARS[0]);
+      document.getElementById('profilePreviewImg').src = tempAvatarDataUrl;
+      document.getElementById('btnCloseProfileModal').classList.toggle('hidden', isFirstSetup);
+
+      const grid = document.getElementById('presetIconsGrid');
+      grid.innerHTML = '';
+      PRESET_AVATARS.forEach(preset => {
+        const dataUrl = generatePresetAvatarDataUrl(preset);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-tactile rounded-full p-0.5 border border-white/15 hover:border-amber-400';
+        btn.innerHTML = `<img src="${dataUrl}" class="w-full aspect-square rounded-full object-cover" />`;
+        btn.onclick = () => {
+          tempAvatarDataUrl = dataUrl;
+          document.getElementById('profilePreviewImg').src = dataUrl;
+        };
+        grid.appendChild(btn);
+      });
+
+      modal.classList.remove('hidden');
+    }
+
+    document.getElementById('btnOpenProfile').addEventListener('click', () => openProfileModal(false));
+    document.getElementById('btnCloseProfileModal').addEventListener('click', () => {
+      stopCamera();
+      document.getElementById('profileModal').classList.add('hidden');
+    });
+
+    document.getElementById('btnOpenCamera').addEventListener('click', async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('Câmera indisponível neste navegador/simulador. Use a galeria ou emblemas!', 'warn');
+        return;
+      }
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        const video = document.getElementById('cameraVideo');
+        video.srcObject = cameraStream;
+        document.getElementById('cameraBox').classList.remove('hidden');
+      } catch (err) {
+        showToast('Permissão de câmera negada ou indisponível.', 'warn');
+      }
+    });
+
+    document.getElementById('btnCapturePhoto').addEventListener('click', () => {
+      const video = document.getElementById('cameraVideo');
+      if (video.videoWidth > 0) {
+        tempAvatarDataUrl = cropImageToCircularAvatar(video, video.videoWidth, video.videoHeight);
+        document.getElementById('profilePreviewImg').src = tempAvatarDataUrl;
+        stopCamera();
+        showToast('Foto capturada!', 'success');
+      }
+    });
+
+    document.getElementById('btnCancelCamera').addEventListener('click', stopCamera);
+
+    document.getElementById('inputGalleryFile').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          tempAvatarDataUrl = cropImageToCircularAvatar(img, img.width, img.height);
+          document.getElementById('profilePreviewImg').src = tempAvatarDataUrl;
+          showToast('Imagem carregada!', 'success');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btnSaveProfile').addEventListener('click', () => {
+      const nick = document.getElementById('inputNickname').value.trim() || 'Explorador';
+      userProfile = {
+        nickname: nick,
+        avatar: tempAvatarDataUrl || generatePresetAvatarDataUrl(PRESET_AVATARS[0])
+      };
+      try {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(userProfile));
+      } catch (e) {}
+      stopCamera();
+      applyProfileToUI();
+      document.getElementById('profileModal').classList.add('hidden');
+      showToast(`Bem-vindo, ${userProfile.nickname}!`, 'success');
+    });
+
+    // Entrada Rápida 1-Clique sem complicação
+    document.getElementById('btnQuickStartProfile').addEventListener('click', () => {
+      const typed = document.getElementById('inputNickname').value.trim();
+      const RANDOM_NAMES = ['Explorador Neon', 'Orbe Cósmico', 'Caçador Solar', 'Vulto Noturno', 'Mestre Eclipse', 'Corredor Zen'];
+      const chosenNick = typed || RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
+      userProfile = {
+        nickname: chosenNick,
+        avatar: tempAvatarDataUrl || generatePresetAvatarDataUrl(PRESET_AVATARS[0])
+      };
+      try {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(userProfile));
+      } catch (e) {}
+      stopCamera();
+      applyProfileToUI();
+      document.getElementById('profileModal').classList.add('hidden');
+      showToast(`Bem-vindo, ${userProfile.nickname}! Bom jogo!`, 'success');
+    });
+
+    // Modal Como Jogar / Tutorial
+    document.getElementById('btnHowToPlay').addEventListener('click', () => {
+      document.getElementById('howToPlayModal').classList.remove('hidden');
+    });
+    document.getElementById('btnCloseHowToPlay').addEventListener('click', () => {
+      document.getElementById('howToPlayModal').classList.add('hidden');
+    });
+    document.getElementById('btnCloseHowToPlay2').addEventListener('click', () => {
+      document.getElementById('howToPlayModal').classList.add('hidden');
+    });
+
+    // Sistema de Pausa
+    function togglePauseMatch() {
+      if (!game.active) return;
+      if (game.mode.startsWith('mp')) {
+        showToast('Partidas multiplayer acontecem em tempo real e não podem ser pausadas.', 'warn');
+        return;
+      }
+      game.paused = !game.paused;
+      document.getElementById('pauseModal').classList.toggle('hidden', !game.paused);
+      if (game.paused) {
+        showToast('Jogo Pausado', 'info');
+      }
+    }
+
+    document.getElementById('btnPauseMatch').addEventListener('click', togglePauseMatch);
+    document.getElementById('btnResumeMatch').addEventListener('click', togglePauseMatch);
+    document.getElementById('btnRestartMatch').addEventListener('click', () => {
+      document.getElementById('pauseModal').classList.add('hidden');
+      initMatch({ mode: game.mode, localRole: game.localRole, difficulty: game.difficulty, stageNum: game.stageNum });
+    });
+    document.getElementById('btnQuitFromPause').addEventListener('click', () => {
+      document.getElementById('pauseModal').classList.add('hidden');
+      showLobbyView();
+    });
+
+    // --------------------------------------------------------------------------
+    // 6. GERADOR DE 50 FASES ÚNICAS COM MODIFICADORES E MAPAS DETERMINÍSTICOS
+    // 1 = Parede, 0 = Cristal, 2 = Núcleo Eclipse, 3 = Vazio/Túnel, 4 = Base Espectro
+    // --------------------------------------------------------------------------
+    const COLS = 19;
+    const ROWS = 21;
+    const STAGE_PROGRESS_KEY = 'eclipse_maze_stages_v1';
+
+    const STAGE_PREFIXES = [
+      'Portal', 'Câmara', 'Abismo', 'Santuário', 'Cidadela',
+      'Corredor', 'Observatório', 'Núcleo', 'Labirinto', 'Bastilha'
+    ];
+    const STAGE_SUFFIXES = [
+      'de Ardósia', 'Bioluminescente', 'do Crepúsculo', 'de Cristal', 'Subterrâneo',
+      'das Sombras', 'Etéreo', 'Magnético', 'Ancestral', 'do Eclipse'
+    ];
+
+    const STAGE_MODIFIERS = [
+      { id: 'classic', label: '✦ Clássico', desc: 'Equilíbrio tático padrão', ghostCount: 3, speedMult: 1.0 },
+      { id: 'darkness', label: '🌑 Breu Total', desc: 'Visão limitada por lanterna', ghostCount: 3, speedMult: 0.98 },
+      { id: 'ice', label: '❄️ Piso Congelado', desc: 'Movimento acelerado deslizante', ghostCount: 3, speedMult: 1.16 },
+      { id: 'overdrive', label: '⚡ Sobrecarga', desc: 'Poderes 2x mais rápidos + 4 Espectros', ghostCount: 4, speedMult: 1.06 },
+      { id: 'relics', label: '💎 Chuva de Relíquias', desc: 'Gemas bônus frequentes', ghostCount: 4, speedMult: 1.04 },
+      { id: 'dualtunnel', label: '🌀 Túneis Duplos', desc: 'Atalhos laterais superiores e inferiores', ghostCount: 4, speedMult: 1.08 }
+    ];
+
+    let selectedStageNum = 1;
+    let completedStages = new Set();
+
+    function loadStageProgress() {
+      try {
+        const raw = localStorage.getItem(STAGE_PROGRESS_KEY);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) completedStages = new Set(arr);
+        }
+      } catch (e) {}
+    }
+
+    function saveStageProgress() {
+      try {
+        localStorage.setItem(STAGE_PROGRESS_KEY, JSON.stringify([...completedStages]));
+      } catch (e) {}
+      document.getElementById('stageProgressDisplay').textContent = `${Math.max(1, completedStages.size)}/50`;
+    }
+
+    // PRNG determinístico por semente (Mulberry32) para cada fase ser idêntica sempre
+    function createSeededRandom(seed) {
+      let a = seed + 0x6D2B79F5;
+      return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function getStageConfig(stageNum) {
+      const idx = Math.max(1, Math.min(50, stageNum));
+      const pName = STAGE_PREFIXES[(idx - 1) % STAGE_PREFIXES.length];
+      const sName = STAGE_SUFFIXES[Math.floor((idx - 1) / 5) % STAGE_SUFFIXES.length];
+      const title = `${String(idx).padStart(2, '0')}. ${pName} ${sName}`;
+
+      // Distribuição variada de modificadores ao longo das 50 fases
+      let mod = STAGE_MODIFIERS[0];
+      if (idx === 1) mod = STAGE_MODIFIERS[0];
+      else if (idx % 5 === 0) mod = STAGE_MODIFIERS[3]; // A cada 5 fases: Sobrecarga (Chefão)
+      else mod = STAGE_MODIFIERS[(idx * 7) % STAGE_MODIFIERS.length];
+
+      // A partir da fase 25 adiciona um espectro extra para maior desafio
+      const extraGhost = idx >= 25 ? 1 : 0;
+      const totalGhosts = Math.min(5, mod.ghostCount + extraGhost);
+
+      return {
+        num: idx,
+        title,
+        modifier: mod,
+        ghostCount: totalGhosts,
+        speedScale: 1 + (idx - 1) * 0.0045
+      };
+    }
+
+    // Gera labirinto simétrico 19x21 único e 100% conectado para cada fase (1 a 50)
+    function generateStageMap(stageNum) {
+      const cfg = getStageConfig(stageNum);
+      const rand = createSeededRandom(stageNum * 9973 + 1337);
+
+      // Começa com tudo corredor (0) e bordas de parede (1)
+      const grid = Array.from({ length: ROWS }, (_, r) =>
+        Array.from({ length: COLS }, (_, c) => (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) ? 1 : 0)
+      );
+
+      // Esculpe blocos internos simétricos (metade esquerda espelhada na direita)
+      for (let r = 2; r < ROWS - 2; r += 2) {
+        for (let c = 2; c <= 8; c += 2) {
+          // Pula área central da base dos espectros
+          if (r >= 8 && r <= 12 && c >= 6) continue;
+          if (rand() < 0.72) {
+            grid[r][c] = 1;
+            grid[r][COLS - 1 - c] = 1;
+
+            // Estende parede em L ou barra mantendo corredores abertos
+            const dir = Math.floor(rand() * 4);
+            const dr = dir === 0 ? -1 : (dir === 1 ? 1 : 0);
+            const dc = dir === 2 ? -1 : (dir === 3 ? 1 : 0);
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr > 1 && nr < ROWS - 2 && nc > 1 && nc <= 8 && !(nr >= 8 && nr <= 12 && nc >= 6)) {
+              grid[nr][nc] = 1;
+              grid[nr][COLS - 1 - nc] = 1;
+            }
+          }
+        }
+      }
+
+      // Garante corredor livre ao redor da base dos espectros (linhas 7..13, cols 5..13)
+      for (let r = 7; r <= 13; r++) {
+        for (let c = 5; c <= 13; c++) {
+          grid[r][c] = 3;
+        }
+      }
+
+      // Constrói a Casa dos Espectros no centro (linhas 9..11, cols 7..11)
+      for (let r = 9; r <= 11; r++) {
+        for (let c = 7; c <= 11; c++) {
+          grid[r][c] = 1;
+        }
+      }
+      grid[9][9] = 4; // Porta superior da base
+      grid[10][8] = 4;
+      grid[10][9] = 4;
+      grid[10][10] = 4;
+
+      // Túnel lateral principal na linha 10
+      grid[10][0] = 3;
+      grid[10][1] = 3;
+      grid[10][COLS - 2] = 3;
+      grid[10][COLS - 1] = 3;
+
+      // Túneis duplos se o modificador da fase for 'dualtunnel'
+      if (cfg.modifier.id === 'dualtunnel') {
+        grid[4][0] = 3; grid[4][1] = 3; grid[4][COLS - 2] = 3; grid[4][COLS - 1] = 3;
+        grid[16][0] = 3; grid[16][1] = 3; grid[16][COLS - 2] = 3; grid[16][COLS - 1] = 3;
+      }
+
+      // Garante spawn limpo do Orbe em (9, 16) e arredores
+      grid[16][9] = 3;
+      grid[16][8] = 0;
+      grid[16][10] = 0;
+
+      // Validação BFS a partir de (9, 16): preenche qualquer bolsão isolado para 100% de jogabilidade
+      const visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+      const queue = [[9, 16]];
+      visited[16][9] = true;
+
+      while (queue.length > 0) {
+        const [cx, cy] = queue.shift();
+        [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
+          let nx = cx + dx;
+          let ny = cy + dy;
+          if ((ny === 10 || (cfg.modifier.id === 'dualtunnel' && (ny === 4 || ny === 16))) && (nx < 0 || nx >= COLS)) {
+            nx = (nx + COLS) % COLS;
+          }
+          if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !visited[ny][nx]) {
+            if (grid[ny][nx] !== 1) {
+              visited[ny][nx] = true;
+              queue.push([nx, ny]);
+            }
+          }
+        });
+      }
+
+      for (let r = 1; r < ROWS - 1; r++) {
+        for (let c = 1; c < COLS - 1; c++) {
+          if (!visited[r][c] && grid[r][c] !== 1) {
+            grid[r][c] = 1; // Fecha bolsões inalcançáveis
+          }
+        }
+      }
+
+      // Posiciona os 4 Núcleos de Eclipse nos cantos acessíveis
+      const corners = [[1, 1], [COLS - 2, 1], [1, ROWS - 2], [COLS - 2, ROWS - 2]];
+      corners.forEach(([cx, cy]) => {
+        if (visited[cy][cx]) {
+          grid[cy][cx] = 2;
+        } else {
+          // Busca célula visitada mais próxima do canto
+          for (let dist = 1; dist < 6; dist++) {
+            let placed = false;
+            for (let dy = -dist; dy <= dist && !placed; dy++) {
+              for (let dx = -dist; dx <= dist && !placed; dx++) {
+                const nx = cx + dx, ny = cy + dy;
+                if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && visited[ny][nx]) {
+                  grid[ny][nx] = 2;
+                  placed = true;
+                }
+              }
+            }
+            if (placed) break;
+          }
+        }
+      });
+
+      return grid;
+    }
+
+    function updateSelectedStageUI() {
+      const cfg = getStageConfig(selectedStageNum);
+      document.getElementById('selectedStageBadge').textContent = `#${cfg.num}`;
+      document.getElementById('stageTitleLabel').textContent = cfg.title;
+      document.getElementById('stageModifierLabel').textContent = `${cfg.modifier.label} • ${cfg.ghostCount} Espectros`;
+      document.getElementById('stageStatusIcon').textContent = completedStages.has(cfg.num) ? '✅' : '🔓';
+    }
+
+    function renderAllStagesModal() {
+      const container = document.getElementById('stagesGridContainer');
+      container.innerHTML = '';
+      for (let i = 1; i <= 50; i++) {
+        const cfg = getStageConfig(i);
+        const done = completedStages.has(i);
+        const isCurrent = i === selectedStageNum;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `btn-tactile p-2.5 rounded-2xl border text-left flex flex-col justify-between transition ${
+          isCurrent
+            ? 'border-amber-400 bg-amber-500/20'
+            : done
+              ? 'border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/40'
+              : 'border-white/10 bg-white/5 hover:bg-white/10'
+        }`;
+        btn.innerHTML = `
+          <div class="flex items-center justify-between w-full mb-1">
+            <span class="font-display font-bold text-xs text-white">#${String(i).padStart(2, '0')}</span>
+            <span class="text-xs">${done ? '✅' : '⚔️'}</span>
+          </div>
+          <div class="text-[10px] font-semibold text-slate-200 truncate w-full">${cfg.title.replace(/^\d+\.\s/, '')}</div>
+          <div class="text-[9px] text-sky-300 truncate w-full mt-0.5">${cfg.modifier.label}</div>
+        `;
+        btn.onclick = () => {
+          selectedStageNum = i;
+          updateSelectedStageUI();
+          document.getElementById('stageSelectModal').classList.add('hidden');
+          showToast(`Fase ${cfg.title} selecionada!`, 'info');
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    document.getElementById('btnPrevStage').addEventListener('click', () => {
+      selectedStageNum = selectedStageNum > 1 ? selectedStageNum - 1 : 50;
+      updateSelectedStageUI();
+    });
+    document.getElementById('btnNextStage').addEventListener('click', () => {
+      selectedStageNum = selectedStageNum < 50 ? selectedStageNum + 1 : 1;
+      updateSelectedStageUI();
+    });
+    document.getElementById('btnOpenStageGrid').addEventListener('click', () => {
+      renderAllStagesModal();
+      document.getElementById('stageSelectModal').classList.remove('hidden');
+    });
+    document.getElementById('btnCloseStageModal').addEventListener('click', () => {
+      document.getElementById('stageSelectModal').classList.add('hidden');
+    });
+
+    // --------------------------------------------------------------------------
+    // 7. MOTOR DO JOGO ASSIMÉTRICO & FÍSICA EM GRADE COM INPUT BUFFERING
+    // --------------------------------------------------------------------------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let game = {
+      active: false,
+      paused: false,
+      mode: 'solo', // 'solo' | 'mp_host' | 'mp_client'
+      localRole: 'orbe', // 'orbe' | 'espectro'
+      difficulty: 'tatico',
+      stageNum: 1,
+      stageConfig: null,
+      round: 1,
+      maxRounds: 1,
+      scores: { orbe: 0, espectro: 0 },
+      grid: [],
+      pelletsRemaining: 0,
+      score: 0,
+      lives: 3,
+      eclipseTimer: 0,
+      eclipseMax: 8.0,
+      relic: null,
+      relicSpawnTimer: 12,
+      particles: [],
+      orbe: null,
+      ghosts: [],
+      lastTime: 0,
+      mpSyncAccumulator: 0
+    };
+
+    function createEntity(gx, gy, speed, isPlayer = false) {
+      return {
+        x: gx,
+        y: gy,
+        dir: DIRS.NONE,
+        nextDir: DIRS.NONE,
+        speed,
+        isPlayer,
+        abilityCooldown: 0,
+        abilityMaxCooldown: 7.0,
+        abilityActiveTimer: 0,
+        mouthPhase: 0
+      };
+    }
+
+    function resetPositions() {
+      const cfg = game.stageConfig || getStageConfig(game.stageNum);
+      const mod = cfg.modifier;
+      const diffMult = game.difficulty === 'casual' ? 0.85 : (game.difficulty === 'implacavel' ? 1.12 : 1.0);
+      const envSpeed = mod.speedMult * cfg.speedScale;
+      const cdMult = mod.id === 'overdrive' ? 0.5 : 1.0;
+      const isMp = game.mode.startsWith('mp');
+
+      // Em multiplayer, velocidades do Orbe e do Espectro Humano são idênticas e fluidas (sem penalidades de bot)
+      const orbeSpeed = 6.2 * (mod.id === 'ice' ? 1.15 : 1.0);
+      game.orbe = createEntity(9, 16, orbeSpeed, game.localRole === 'orbe');
+      game.orbe.abilityMaxCooldown = 6.0 * cdMult;
+
+      const ghostSpawns = [
+        { x: 9, y: 8, name: 'Alfa', speedFactor: 0.94 },
+        { x: 8, y: 10, name: 'Sombra', speedFactor: 0.88 },
+        { x: 10, y: 10, name: 'Vulto', speedFactor: 0.85 },
+        { x: 9, y: 10, name: 'Abissal', speedFactor: 0.91 },
+        { x: 8, y: 8, name: 'Spectra', speedFactor: 0.89 }
+      ];
+
+      game.ghosts = [];
+      for (let i = 0; i < cfg.ghostCount; i++) {
+        const sp = ghostSpawns[i % ghostSpawns.length];
+        const isHumanGhost = (i === 0 && (game.localRole === 'espectro' || isMp));
+        // O jogador humano caçador em MP recebe velocidade balanceada de 6.1 (sem penalidade de IA casual)
+        const gSpeed = isHumanGhost
+          ? 6.1 * (mod.id === 'ice' ? 1.15 : 1.0)
+          : 6.0 * sp.speedFactor * diffMult * envSpeed;
+        const g = createEntity(sp.x, sp.y, gSpeed, isHumanGhost);
+        g.id = i;
+        g.name = sp.name;
+        g.abilityMaxCooldown = 9.0 * cdMult;
+        game.ghosts.push(g);
+      }
+
+      game.eclipseTimer = 0;
+    }
+
+    function initMatch({ mode = 'solo', localRole = 'orbe', difficulty = 'tatico', stageNum = selectedStageNum, maxRounds = 1, keepRound = false, keepScore = false }) {
+      sfx.init();
+      game.mode = mode;
+      game.localRole = localRole;
+      game.difficulty = difficulty;
+      game.stageNum = stageNum;
+      game.stageConfig = getStageConfig(stageNum);
+      game.maxRounds = maxRounds;
+
+      if (!keepRound) {
+        game.round = 1;
+        game.scores = { orbe: 0, espectro: 0 };
+      }
+
+      if (!keepScore) {
+        game.score = 0;
+        game.lives = 3;
+      }
+
+      game.particles = [];
+      game.relic = null;
+      game.relicSpawnTimer = game.stageConfig.modifier.id === 'relics' ? 4 : 10;
+
+      // Gera o labirinto exclusivo da fase e conta cristais
+      game.grid = generateStageMap(stageNum);
+      game.pelletsRemaining = 0;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (game.grid[r][c] === 0 || game.grid[r][c] === 2) {
+            game.pelletsRemaining++;
+          }
+        }
+      }
+
+      resetPositions();
+      updateHud();
+      showGameView();
+
+      // Contagem regressiva inicial com info da fase
+      game.active = true;
+      game.paused = true;
+      const modInfo = `${game.stageConfig.modifier.label} — ${game.stageConfig.modifier.desc}`;
+      showArenaOverlay(game.stageConfig.title.toUpperCase(), '3', modInfo, false);
+
+      let count = 3;
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          document.getElementById('overlayTitle').textContent = String(count);
+          sfx.playTone(440, 'sine', 0.08, 0.08);
+        } else {
+          clearInterval(timer);
+          document.getElementById('arenaOverlay').classList.add('hidden');
+          game.paused = false;
+          sfx.playTone(660, 'triangle', 0.15, 0.12);
+        }
+      }, 650);
+    }
+
+    function showArenaOverlay(badge, title, subtitle, showActions, showNextStage = false) {
+      const ov = document.getElementById('arenaOverlay');
+      document.getElementById('overlayBadge').textContent = badge;
+      document.getElementById('overlayTitle').textContent = title;
+      document.getElementById('overlaySubtitle').textContent = subtitle;
+      document.getElementById('overlayActions').classList.toggle('hidden', !showActions);
+      document.getElementById('btnNextRoundStage').classList.toggle('hidden', !showNextStage);
+      ov.classList.remove('hidden');
+    }
+
+    function spawnParticles(gx, gy, color, count = 12) {
+      for (let i = 0; i < count; i++) {
+        const ang = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+        const spd = 1.5 + Math.random() * 3.5;
+        game.particles.push({
+          x: gx + 0.5,
+          y: gy + 0.5,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          life: 0.45 + Math.random() * 0.25,
+          maxLife: 0.7,
+          color
+        });
+      }
+    }
+
+    function isTunnelRow(gy) {
+      if (gy === 10) return true;
+      if (game.stageConfig && game.stageConfig.modifier.id === 'dualtunnel' && (gy === 4 || gy === 16)) return true;
+      return false;
+    }
+
+    function isTileWalkable(gx, gy, isGhost = false, phaseWalk = false) {
+      // Túneis horizontais nas laterais
+      if (isTunnelRow(gy) && (gx < 0 || gx >= COLS)) return true;
+      if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) return false;
+      if (phaseWalk && gx > 0 && gx < COLS - 1 && gy > 0 && gy < ROWS - 1) return true;
+
+      const tile = game.grid[gy][gx];
+      if (tile === 1) return false;
+      if (tile === 4 && !isGhost) return false;
+      return true;
+    }
+
+    function moveEntity(ent, dt, isGhost = false) {
+      const phaseWalk = isGhost && ent.abilityActiveTimer > 0;
+      const speedMult = (!isGhost && ent.abilityActiveTimer > 0) ? 1.55 : (isGhost && game.eclipseTimer > 0 ? 0.68 : 1.0);
+      const step = ent.speed * speedMult * dt;
+
+      // 1. Reversão instantânea (180 graus): resposta imediata sem espera
+      if (ent.nextDir && ent.dir && ent.dir.name !== 'NONE' && ent.nextDir.name !== 'NONE') {
+        if (ent.nextDir.x === -ent.dir.x && ent.nextDir.y === -ent.dir.y) {
+          ent.dir = ent.nextDir;
+        }
+      }
+
+      const cx = Math.round(ent.x);
+      const cy = Math.round(ent.y);
+      const distToCenter = Math.hypot(ent.x - cx, ent.y - cy);
+
+      // 2. Curvas com tolerância suave (0.36 em vez de 0.22) para eliminar atrasos de esquina
+      if (ent.nextDir && ent.nextDir.name !== 'NONE' && ent.nextDir.name !== ent.dir.name && distToCenter < 0.36) {
+        const tx = cx + ent.nextDir.x;
+        const ty = cy + ent.nextDir.y;
+        if (isTileWalkable(tx, ty, isGhost, phaseWalk)) {
+          ent.x = cx;
+          ent.y = cy;
+          ent.dir = ent.nextDir;
+        }
+      }
+
+      if (ent.dir.name === 'NONE') return;
+
+      let nx = ent.x + ent.dir.x * step;
+      let ny = ent.y + ent.dir.y * step;
+
+      // Túneis laterais
+      if (isTunnelRow(Math.round(ny))) {
+        if (nx < -0.5) nx = COLS - 0.5;
+        else if (nx > COLS - 0.5) nx = -0.5;
+      }
+
+      const aheadX = Math.round(nx + ent.dir.x * 0.48);
+      const aheadY = Math.round(ny + ent.dir.y * 0.48);
+
+      if (!isTileWalkable(aheadX, aheadY, isGhost, phaseWalk)) {
+        ent.x = cx;
+        ent.y = cy;
+      } else {
+        ent.x = nx;
+        ent.y = ny;
+      }
+    }
+
+    function updateBotAI(ghost, index) {
+      const cx = Math.round(ghost.x);
+      const cy = Math.round(ghost.y);
+      if (Math.hypot(ghost.x - cx, ghost.y - cy) > 0.16) return;
+
+      const possible = [DIRS.UP, DIRS.DOWN, DIRS.LEFT, DIRS.RIGHT].filter(d => {
+        if (d.x === -ghost.dir.x && d.y === -ghost.dir.y && ghost.dir.name !== 'NONE') return false;
+        return isTileWalkable(cx + d.x, cy + d.y, true, false);
+      });
+
+      if (possible.length === 0) {
+        const rev = [DIRS.UP, DIRS.DOWN, DIRS.LEFT, DIRS.RIGHT].find(d => isTileWalkable(cx + d.x, cy + d.y, true, false));
+        if (rev) ghost.nextDir = rev;
+        return;
+      }
+
+      // Alvo tático: perseguição direta (Alfa), emboscada à frente (Sombra) ou patrulha
+      let targetX = game.orbe.x;
+      let targetY = game.orbe.y;
+      if (index === 1) {
+        targetX += game.orbe.dir.x * 3;
+        targetY += game.orbe.dir.y * 3;
+      }
+
+      const flee = game.eclipseTimer > 0;
+      let bestDir = possible[0];
+      let bestScore = flee ? -Infinity : Infinity;
+
+      possible.forEach(d => {
+        const dist = Math.hypot((cx + d.x) - targetX, (cy + d.y) - targetY);
+        if (flee ? dist > bestScore : dist < bestScore) {
+          bestScore = dist;
+          bestDir = d;
+        }
+      });
+
+      ghost.nextDir = bestDir;
+    }
+
+    function updateOrbeBotAI() {
+      const o = game.orbe;
+      const cx = Math.round(o.x);
+      const cy = Math.round(o.y);
+      if (Math.hypot(o.x - cx, o.y - cy) > 0.16) return;
+
+      const possible = [DIRS.UP, DIRS.DOWN, DIRS.LEFT, DIRS.RIGHT].filter(d => {
+        if (d.x === -o.dir.x && d.y === -o.dir.y && o.dir.name !== 'NONE') return false;
+        return isTileWalkable(cx + d.x, cy + d.y, false, false);
+      });
+
+      if (possible.length === 0) return;
+
+      let bestDir = possible[0];
+      let bestScore = -Infinity;
+
+      possible.forEach(d => {
+        const nx = cx + d.x;
+        const ny = cy + d.y;
+        let score = Math.random() * 1.5;
+
+        // Distância do fantasma mais próximo
+        let minGhostDist = Infinity;
+        game.ghosts.forEach(g => {
+          minGhostDist = Math.min(minGhostDist, Math.hypot(nx - g.x, ny - g.y));
+        });
+
+        if (game.eclipseTimer > 0) {
+          score -= minGhostDist * 2.5;
+        } else {
+          score += Math.min(minGhostDist, 6) * 3.0;
+          if (minGhostDist < 3.2 && o.abilityCooldown <= 0) {
+            activateEntityAbility(o, 'orbe');
+          }
+        }
+
+        if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+          const tile = game.grid[ny][nx];
+          if (tile === 0) score += 4;
+          if (tile === 2) score += 12;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestDir = d;
+        }
+      });
+
+      o.nextDir = bestDir;
+    }
+
+    function activateEntityAbility(ent, role) {
+      if (!ent || ent.abilityCooldown > 0) return;
+      ent.abilityCooldown = ent.abilityMaxCooldown;
+      ent.abilityActiveTimer = role === 'orbe' ? 2.2 : 1.6;
+      sfx.ability();
+      spawnParticles(ent.x, ent.y, role === 'orbe' ? '#F59E0B' : '#38BDF8', 16);
+    }
+
+    function triggerLocalAbility() {
+      if (!game.active || game.paused) return;
+      if (game.mode === 'mp_client') {
+        sendMpPacket({ type: 'ability' });
+        return;
+      }
+      const actor = game.localRole === 'orbe' ? game.orbe : game.ghosts[0];
+      activateEntityAbility(actor, game.localRole);
+    }
+
+    function handleRoundEnd(winnerRole) {
+      game.paused = true;
+      game.scores[winnerRole] = (game.scores[winnerRole] || 0) + 1;
+
+      if (game.mode === 'mp_host') {
+        sendMpPacket({ type: 'round_end', winnerRole });
+      }
+
+      // Salva recorde local
+      try {
+        const prevHigh = parseInt(localStorage.getItem(HIGHSCORE_KEY) || '0', 10);
+        if (game.score > prevHigh) {
+          localStorage.setItem(HIGHSCORE_KEY, String(game.score));
+          document.getElementById('highScoreDisplay').textContent = String(game.score);
+        }
+      } catch (e) {}
+
+      const didLocalWin = winnerRole === game.localRole;
+      if (didLocalWin) sfx.win();
+      else sfx.hit();
+
+      if (didLocalWin && game.mode === 'solo') {
+        completedStages.add(game.stageNum);
+        saveStageProgress();
+        if (game.stageNum < 50) {
+          selectedStageNum = game.stageNum + 1;
+          updateSelectedStageUI();
+        }
+      }
+
+      if (game.round < game.maxRounds) {
+        const nextRound = game.round + 1;
+        const nextRole = game.mode.startsWith('mp') ? (game.localRole === 'orbe' ? 'espectro' : 'orbe') : game.localRole;
+        showArenaOverlay(
+          `RODADA ${game.round} DE ${game.maxRounds}`,
+          didLocalWin ? 'Vitória na Rodada!' : 'Rodada Perdida',
+          'Trocando posições para a próxima rodada...',
+          false
+        );
+        if (game.mode === 'mp_host') {
+          setTimeout(() => {
+            game.round = nextRound;
+            const guestNextRole = nextRole === 'orbe' ? 'espectro' : 'orbe';
+            sendMpPacket({ type: 'next_round', round: nextRound, guestRole: guestNextRole });
+            initMatch({ mode: game.mode, localRole: nextRole, difficulty: game.difficulty, stageNum: game.stageNum, maxRounds: game.maxRounds, keepRound: true });
+          }, 2200);
+        } else if (game.mode === 'solo') {
+          setTimeout(() => {
+            game.round = nextRound;
+            initMatch({ mode: game.mode, localRole: nextRole, difficulty: game.difficulty, stageNum: game.stageNum, maxRounds: game.maxRounds, keepRound: true });
+          }, 2200);
+        }
+      } else {
+        game.active = false;
+        const canAdvanceStage = didLocalWin && game.mode === 'solo' && game.stageNum < 50;
+        showArenaOverlay(
+          `FASE #${game.stageNum} • FIM`,
+          didLocalWin ? '🏆 Fase Concluída!' : '💀 Fim de Jogo!',
+          `Pontuação: ${game.score} pts • ${game.stageConfig ? game.stageConfig.title : ''}`,
+          true,
+          canAdvanceStage
+        );
+      }
+    }
+
+    function updateGame(dt) {
+      if (!game.active || game.paused) return;
+
+      // Atualiza cooldowns e timers
+      [game.orbe, ...game.ghosts].forEach(ent => {
+        if (ent.abilityCooldown > 0) ent.abilityCooldown = Math.max(0, ent.abilityCooldown - dt);
+        if (ent.abilityActiveTimer > 0) ent.abilityActiveTimer = Math.max(0, ent.abilityActiveTimer - dt);
+      });
+
+      if (game.eclipseTimer > 0) {
+        game.eclipseTimer = Math.max(0, game.eclipseTimer - dt);
+      }
+
+      // Relíquia Bônus no centro do mapa (frequência dobrada na fase Chuva de Relíquias)
+      const isRelicRain = game.stageConfig && game.stageConfig.modifier.id === 'relics';
+      if (!game.relic) {
+        game.relicSpawnTimer -= dt;
+        if (game.relicSpawnTimer <= 0) {
+          game.relic = { x: 9, y: 12, timer: isRelicRain ? 11.0 : 9.0 };
+          game.relicSpawnTimer = isRelicRain ? 6.5 : 16.0;
+        }
+      } else {
+        game.relic.timer -= dt;
+        if (game.relic.timer <= 0) game.relic = null;
+      }
+
+      // Cliente MP roda simulação local a 60 FPS com interpolação suave (sem delay)
+      if (game.mode === 'mp_client') {
+        moveEntity(game.orbe, dt, false);
+        game.orbe.mouthPhase += dt * 11;
+        game.ghosts.forEach(g => moveEntity(g, dt, true));
+
+        // LERP suave para as posições autoritativas do host
+        if (game.orbe && game.orbe._targetX !== undefined) {
+          const dx = game.orbe._targetX - game.orbe.x;
+          const dy = game.orbe._targetY - game.orbe.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 1.3) {
+            game.orbe.x = game.orbe._targetX;
+            game.orbe.y = game.orbe._targetY;
+          } else if (dist > 0.01) {
+            game.orbe.x += dx * 0.45;
+            game.orbe.y += dy * 0.45;
+          }
+        }
+
+        if (game.ghosts) {
+          game.ghosts.forEach(g => {
+            if (g._targetX !== undefined) {
+              const dx = g._targetX - g.x;
+              const dy = g._targetY - g.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist > 1.3) {
+                g.x = g._targetX;
+                g.y = g._targetY;
+              } else if (dist > 0.01) {
+                g.x += dx * 0.45;
+                g.y += dy * 0.45;
+              }
+            }
+          });
+        }
+
+        updateHud();
+        return;
+      }
+
+      // IA para entidades não controladas por humanos
+      if (game.localRole !== 'orbe' && game.mode === 'solo') {
+        updateOrbeBotAI();
+      }
+      game.ghosts.forEach((g, idx) => {
+        const isHumanGhost = (idx === 0 && (game.localRole === 'espectro' || game.mode === 'mp_host'));
+        if (!isHumanGhost) {
+          updateBotAI(g, idx);
+        }
+      });
+
+      // Movimentação Host/Solo 60 FPS
+      moveEntity(game.orbe, dt, false);
+      game.orbe.mouthPhase += dt * 11;
+      game.ghosts.forEach(g => moveEntity(g, dt, true));
+
+      // Coleta de Cristais e Núcleos Eclipse
+      const ox = Math.round(game.orbe.x);
+      const oy = Math.round(game.orbe.y);
+      if (ox >= 0 && ox < COLS && oy >= 0 && oy < ROWS) {
+        const tile = game.grid[oy][ox];
+        if (tile === 0) {
+          game.grid[oy][ox] = 3;
+          game.pelletsRemaining--;
+          game.score += 10;
+          sfx.chomp();
+          if (game.mode === 'mp_host') {
+            sendMpPacket({ type: 'eat', x: ox, y: oy, tile: 3, score: game.score, pellets: game.pelletsRemaining, eclipse: game.eclipseTimer });
+          }
+        } else if (tile === 2) {
+          game.grid[oy][ox] = 3;
+          game.pelletsRemaining--;
+          game.score += 50;
+          game.eclipseTimer = game.eclipseMax;
+          sfx.powerPellet();
+          spawnParticles(ox, oy, '#38BDF8', 20);
+          showToast('🌑 MODO ECLIPSE! Cace os Espectros!', 'info');
+          if (game.mode === 'mp_host') {
+            sendMpPacket({ type: 'eat', x: ox, y: oy, tile: 3, score: game.score, pellets: game.pelletsRemaining, eclipse: game.eclipseTimer });
+          }
+        }
+      }
+
+      // Coleta de Relíquia Bônus
+      if (game.relic && Math.hypot(game.orbe.x - game.relic.x, game.orbe.y - game.relic.y) < 0.7) {
+        game.score += 200;
+        game.orbe.abilityCooldown = 0;
+        sfx.win();
+        spawnParticles(game.relic.x, game.relic.y, '#10B981', 18);
+        showToast('💎 Relíquia Bônus (+200 pts & Recarga)!', 'success');
+        game.relic = null;
+        if (game.mode === 'mp_host') {
+          sendMpPacket({ type: 'relic_taken', score: game.score });
+        }
+      }
+
+      // Colisão Orbe vs Espectros
+      game.ghosts.forEach(g => {
+        if (Math.hypot(game.orbe.x - g.x, game.orbe.y - g.y) < 0.62) {
+          if (game.eclipseTimer > 0) {
+            // Orbe devora Espectro
+            game.score += 150;
+            sfx.eatGhost();
+            spawnParticles(g.x, g.y, '#38BDF8', 22);
+            g.x = 9;
+            g.y = 10;
+            g.dir = DIRS.UP;
+            if (game.mode === 'mp_host') {
+              sendMpPacket({ type: 'ghost_eaten', id: g.id, score: game.score });
+            }
+          } else {
+            // Espectro captura Orbe
+            sfx.hit();
+            spawnParticles(game.orbe.x, game.orbe.y, '#F43F5E', 24);
+            game.lives--;
+            if (game.lives <= 0) {
+              handleRoundEnd('espectro');
+            } else {
+              resetPositions();
+              showToast(`Capturado! Vidas restantes: ${game.lives}`, 'danger');
+              if (game.mode === 'mp_host') {
+                sendMpPacket({ type: 'reset_pos', lives: game.lives });
+              }
+            }
+          }
+        }
+      });
+
+      // Vitória do Orbe ao limpar cristais
+      if (game.pelletsRemaining <= 0) {
+        handleRoundEnd('orbe');
+      }
+
+      // Sincronia Multiplayer Alta Frequência (40x por segundo = a cada 0.025s)
+      if (game.mode === 'mp_host') {
+        game.mpSyncAccumulator += dt;
+        if (game.mpSyncAccumulator >= 0.025) {
+          game.mpSyncAccumulator = 0;
+          broadcastMpState();
+        }
+      }
+
+      updateHud();
+    }
+
+    function updateHud() {
+      const isOrbe = game.localRole === 'orbe';
+      document.getElementById('hudRoleIcon').textContent = isOrbe ? '🟡' : '👻';
+      document.getElementById('hudRoleLabel').textContent = isOrbe ? 'ORBE' : 'ESPECTRO';
+      document.getElementById('hudRoleLabel').className = `text-[11px] font-extrabold uppercase tracking-wider ${isOrbe ? 'text-amber-400' : 'text-rose-400'}`;
+      document.getElementById('hudRoundBadge').textContent = game.mode === 'solo' ? `FASE ${game.stageNum}/50` : `R${game.round}/${game.maxRounds}`;
+      document.getElementById('hudScore').textContent = game.score;
+      document.getElementById('hudLives').textContent = '❤️'.repeat(Math.max(0, game.lives)) || '💀';
+
+      const eclipseWrap = document.getElementById('hudEclipseBarWrap');
+      if (game.eclipseTimer > 0) {
+        eclipseWrap.classList.remove('hidden');
+        document.getElementById('hudEclipseBar').style.width = `${(game.eclipseTimer / game.eclipseMax) * 100}%`;
+        document.getElementById('hudStatusText').textContent = '🌑 ECLIPSE ATIVO!';
+      } else {
+        eclipseWrap.classList.add('hidden');
+        document.getElementById('hudStatusText').textContent = `Cristais: ${game.pelletsRemaining}`;
+      }
+
+      // Botão de Habilidade Especial
+      const actor = isOrbe ? game.orbe : game.ghosts[0];
+      if (actor) {
+        const titleEl = document.getElementById('abilityTitle');
+        const statusEl = document.getElementById('abilityStatus');
+        const fillEl = document.getElementById('abilityCooldownFill');
+
+        titleEl.textContent = isOrbe ? '⚡ IMPULSO VELOZ' : '🌀 FASE ETÉREA (ATRAVESSAR)';
+        if (actor.abilityActiveTimer > 0) {
+          statusEl.textContent = `ATIVO (${actor.abilityActiveTimer.toFixed(1)}s)`;
+          fillEl.style.transform = 'scaleX(1)';
+        } else if (actor.abilityCooldown > 0) {
+          statusEl.textContent = `RECARREGANDO (${actor.abilityCooldown.toFixed(1)}s)`;
+          const ratio = 1 - (actor.abilityCooldown / actor.abilityMaxCooldown);
+          fillEl.style.transform = `scaleX(${Math.max(0, Math.min(1, ratio))})`;
+        } else {
+          statusEl.textContent = 'PRONTO (ESPAÇO / TOQUE)';
+          fillEl.style.transform = 'scaleX(1)';
+        }
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 8. RENDERIZAÇÃO CANVAS RESPONSIVA
+    // --------------------------------------------------------------------------
+    function resizeCanvas() {
+      const container = document.getElementById('canvasContainer');
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const aspect = COLS / ROWS;
+      let w = rect.width;
+      let h = w / aspect;
+      if (h > rect.height) {
+        h = rect.height;
+        w = h * aspect;
+      }
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.style.width = `${Math.floor(w)}px`;
+      canvas.style.height = `${Math.floor(h)}px`;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    function renderGame(dt) {
+      if (!game.active) return;
+      const t = THEMES[currentThemeKey];
+      const cell = canvas.width / COLS;
+
+      ctx.fillStyle = t.canvasBg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Grade sutil
+      ctx.strokeStyle = t.gridLine;
+      ctx.lineWidth = 1;
+      for (let c = 0; c <= COLS; c++) {
+        ctx.beginPath();
+        ctx.moveTo(c * cell, 0);
+        ctx.lineTo(c * cell, canvas.height);
+        ctx.stroke();
+      }
+      for (let r = 0; r <= ROWS; r++) {
+        ctx.beginPath();
+        ctx.moveTo(0, r * cell);
+        ctx.lineTo(canvas.width, r * cell);
+        ctx.stroke();
+      }
+
+      // Paredes, Cristais e Núcleos Eclipse
+      const pulse = 0.85 + Math.sin(performance.now() * 0.006) * 0.2;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const tile = game.grid[r][c];
+          const px = c * cell;
+          const py = r * cell;
+
+          if (tile === 1) {
+            ctx.fillStyle = t.wallFill;
+            ctx.strokeStyle = t.wallStroke;
+            ctx.lineWidth = Math.max(1.5, cell * 0.06);
+            const pad = cell * 0.08;
+            ctx.beginPath();
+            ctx.roundRect(px + pad, py + pad, cell - pad * 2, cell - pad * 2, cell * 0.22);
+            ctx.fill();
+            ctx.stroke();
+          } else if (tile === 0) {
+            ctx.fillStyle = t.pelletColor;
+            ctx.beginPath();
+            ctx.arc(px + cell / 2, py + cell / 2, cell * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (tile === 2) {
+            ctx.fillStyle = t.powerColor;
+            ctx.beginPath();
+            ctx.arc(px + cell / 2, py + cell / 2, cell * 0.26 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // Relíquia Bônus
+      if (game.relic) {
+        const rx = (game.relic.x + 0.5) * cell;
+        const ry = (game.relic.y + 0.5) * cell;
+        ctx.fillStyle = '#10B981';
+        ctx.beginPath();
+        ctx.moveTo(rx, ry - cell * 0.32);
+        ctx.lineTo(rx + cell * 0.28, ry);
+        ctx.lineTo(rx, ry + cell * 0.32);
+        ctx.lineTo(rx - cell * 0.28, ry);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Renderiza Orbe
+      if (game.orbe) {
+        const ox = (game.orbe.x + 0.5) * cell;
+        const oy = (game.orbe.y + 0.5) * cell;
+        const radius = cell * 0.4;
+        const mouthAngle = Math.abs(Math.sin(game.orbe.mouthPhase)) * 0.55 + 0.06;
+
+        let rot = 0;
+        if (game.orbe.dir.name === 'DOWN') rot = Math.PI / 2;
+        else if (game.orbe.dir.name === 'LEFT') rot = Math.PI;
+        else if (game.orbe.dir.name === 'UP') rot = -Math.PI / 2;
+
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.rotate(rot);
+        ctx.fillStyle = game.orbe.abilityActiveTimer > 0 ? '#FEF08A' : t.orbeColor;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius, mouthAngle, Math.PI * 2 - mouthAngle);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Renderiza Espectros
+      game.ghosts.forEach((g, idx) => {
+        const gx = (g.x + 0.5) * cell;
+        const gy = (g.y + 0.5) * cell;
+        const r = cell * 0.4;
+
+        ctx.save();
+        if (g.abilityActiveTimer > 0) ctx.globalAlpha = 0.55;
+        ctx.fillStyle = game.eclipseTimer > 0 ? t.frightenedColor : t.ghostColors[idx % t.ghostColors.length];
+
+        ctx.beginPath();
+        ctx.arc(gx, gy - r * 0.1, r, Math.PI, 0, false);
+        ctx.lineTo(gx + r, gy + r * 0.85);
+        ctx.lineTo(gx + r * 0.33, gy + r * 0.55);
+        ctx.lineTo(gx, gy + r * 0.85);
+        ctx.lineTo(gx - r * 0.33, gy + r * 0.55);
+        ctx.lineTo(gx - r, gy + r * 0.85);
+        ctx.closePath();
+        ctx.fill();
+
+        // Olhos
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(gx - r * 0.32, gy - r * 0.15, r * 0.22, 0, Math.PI * 2);
+        ctx.arc(gx + r * 0.32, gy - r * 0.15, r * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0F172A';
+        ctx.beginPath();
+        ctx.arc(gx - r * 0.32 + g.dir.x * 2, gy - r * 0.15 + g.dir.y * 2, r * 0.11, 0, Math.PI * 2);
+        ctx.arc(gx + r * 0.32 + g.dir.x * 2, gy - r * 0.15 + g.dir.y * 2, r * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Partículas
+      for (let i = game.particles.length - 1; i >= 0; i--) {
+        const p = game.particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) {
+          game.particles.splice(i, 1);
+          continue;
+        }
+        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x * cell, p.y * cell, cell * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // Modificador especial: Breu Total (Fog of War com lanterna dinâmica)
+      if (game.stageConfig && game.stageConfig.modifier.id === 'darkness' && game.eclipseTimer <= 0) {
+        const focusEnt = game.localRole === 'orbe' ? game.orbe : game.ghosts[0];
+        if (focusEnt) {
+          const fx = (focusEnt.x + 0.5) * cell;
+          const fy = (focusEnt.y + 0.5) * cell;
+          const visionRadius = cell * 4.4;
+          const grad = ctx.createRadialGradient(fx, fy, cell * 1.4, fx, fy, visionRadius);
+          grad.addColorStop(0, 'rgba(5, 8, 15, 0)');
+          grad.addColorStop(0.72, 'rgba(5, 8, 15, 0.88)');
+          grad.addColorStop(1, 'rgba(5, 8, 15, 0.98)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }
+
+    function mainLoop(timestamp) {
+      const dt = Math.min((timestamp - game.lastTime) / 1000, 0.05);
+      game.lastTime = timestamp;
+      updateGame(dt);
+      renderGame(dt);
+      requestAnimationFrame(mainLoop);
+    }
+
+    // --------------------------------------------------------------------------
+    // 9. CONTROLES TECLADO, SWIPE TOUCH E D-PAD
+    // --------------------------------------------------------------------------
+    function setPlayerDirection(dirName) {
+      if (!game.active || !DIRS[dirName]) return;
+      if (navigator.vibrate) navigator.vibrate(10);
+
+      // Predição local imediata no cliente/host (Zero Input Lag)
+      const actor = game.localRole === 'orbe' ? game.orbe : game.ghosts[0];
+      if (actor) {
+        actor.nextDir = DIRS[dirName];
+        // Reversão instantânea imediata se for 180 graus
+        if (actor.dir.name !== 'NONE' && DIRS[dirName].x === -actor.dir.x && DIRS[dirName].y === -actor.dir.y) {
+          actor.dir = DIRS[dirName];
+        }
+      }
+
+      if (game.mode === 'mp_client') {
+        sendMpPacket({ type: 'dir', dir: dirName });
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'arrowup' || k === 'w') { e.preventDefault(); setPlayerDirection('UP'); }
+      else if (k === 'arrowdown' || k === 's') { e.preventDefault(); setPlayerDirection('DOWN'); }
+      else if (k === 'arrowleft' || k === 'a') { e.preventDefault(); setPlayerDirection('LEFT'); }
+      else if (k === 'arrowright' || k === 'd') { e.preventDefault(); setPlayerDirection('RIGHT'); }
+      else if (e.code === 'Space') { e.preventDefault(); triggerLocalAbility(); }
+      else if (k === 'p' || e.key === 'Escape') { e.preventDefault(); togglePauseMatch(); }
+    });
+
+    // Swipe direcional fluido no canvas
+    let touchStartX = 0;
+    let touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!touchStartX && !touchStartY) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (Math.hypot(dx, dy) > 22) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          setPlayerDirection(dx > 0 ? 'RIGHT' : 'LEFT');
+        } else {
+          setPlayerDirection(dy > 0 ? 'DOWN' : 'UP');
+        }
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    document.querySelectorAll('.dpad-btn').forEach(btn => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        setPlayerDirection(btn.dataset.dir);
+      });
+    });
+
+    document.getElementById('btnSpecialAbility').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      triggerLocalAbility();
+    });
+
+    document.getElementById('btnToggleDpad').addEventListener('click', () => {
+      document.getElementById('onscreenDpad').classList.toggle('hidden');
+    });
+
+    // --------------------------------------------------------------------------
+    // 10. MULTIPLAYER P2P ZERO-BACKEND (PEERJS + FALLBACK SANDBOX/BROADCAST)
+    // --------------------------------------------------------------------------
+    let peer = null;
+    let mpConn = null;
+    let localChannel = null;
+    let currentRoomCode = '';
+    let isRoomHost = false;
+    let isSandboxMp = false;
+
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+
+    function sendMpPacket(data) {
+      if (mpConn && mpConn.open) {
+        try { mpConn.send(data); } catch (e) {}
+      } else if (localChannel) {
+        try { localChannel.postMessage(data); } catch (e) {}
+      }
+    }
+
+    function broadcastMpState() {
+      // Pacote ultraleve (~140 bytes) enviado a 40Hz para máxima fluidez sem delay
+      sendMpPacket({
+        type: 'pos',
+        ox: Math.round(game.orbe.x * 100) / 100,
+        oy: Math.round(game.orbe.y * 100) / 100,
+        od: game.orbe.dir.name,
+        oa: game.orbe.abilityActiveTimer,
+        ghosts: game.ghosts.map(g => ({
+          id: g.id,
+          x: Math.round(g.x * 100) / 100,
+          y: Math.round(g.y * 100) / 100,
+          d: g.dir.name,
+          a: g.abilityActiveTimer
+        })),
+        e: Math.round(game.eclipseTimer * 10) / 10,
+        l: game.lives,
+        s: game.score,
+        rx: game.relic ? game.relic.x : -1,
+        ry: game.relic ? game.relic.y : -1
+      });
+    }
+
+    function handleIncomingMpData(msg) {
+      if (!msg || !msg.type) return;
+
+      if (msg.type === 'hello') {
+        if (isRoomHost) {
+          document.getElementById('mpGuestPlaceholder').classList.add('hidden');
+          document.getElementById('btnSimulateGuest').classList.add('hidden');
+          const gImg = document.getElementById('mpGuestAvatar');
+          gImg.src = msg.profile.avatar;
+          gImg.classList.remove('hidden');
+          document.getElementById('mpGuestName').textContent = msg.profile.nickname;
+          document.getElementById('mpGuestName').classList.replace('text-slate-400', 'text-white');
+
+          const startBtn = document.getElementById('btnStartMpMatch');
+          startBtn.disabled = false;
+          startBtn.textContent = '▶ Iniciar Duelo Agora!';
+          showToast(`🎮 ${msg.profile.nickname} entrou na sala!`, 'success');
+
+          sendMpPacket({
+            type: 'hello_ack',
+            profile: userProfile,
+            hostRole: document.getElementById('mpHostRoleSelect').value,
+            stageNum: selectedStageNum,
+            bestOf3: document.getElementById('mpBestOf3').checked
+          });
+        }
+      } else if (msg.type === 'hello_ack' && !isRoomHost) {
+        document.getElementById('mpHostAvatar').src = msg.profile.avatar;
+        document.getElementById('mpHostName').textContent = msg.profile.nickname;
+        document.getElementById('mpHostName').classList.replace('text-slate-400', 'text-white');
+        showToast(`Conectado à sala de ${msg.profile.nickname}! Aguardando início...`, 'success');
+      } else if (msg.type === 'start_match') {
+        initMatch({
+          mode: 'mp_client',
+          localRole: msg.guestRole,
+          stageNum: msg.stageNum || 1,
+          maxRounds: msg.maxRounds
+        });
+      } else if (msg.type === 'dir' && isRoomHost) {
+        const guestActor = game.localRole === 'orbe' ? game.ghosts[0] : game.orbe;
+        if (guestActor && DIRS[msg.dir]) {
+          guestActor.nextDir = DIRS[msg.dir];
+          // Se for reversão imediata 180°
+          if (guestActor.dir.name !== 'NONE' && DIRS[msg.dir].x === -guestActor.dir.x && DIRS[msg.dir].y === -guestActor.dir.y) {
+            guestActor.dir = DIRS[msg.dir];
+          }
+        }
+      } else if (msg.type === 'ability' && isRoomHost) {
+        const guestRole = game.localRole === 'orbe' ? 'espectro' : 'orbe';
+        const guestActor = guestRole === 'orbe' ? game.orbe : game.ghosts[0];
+        activateEntityAbility(guestActor, guestRole);
+      } else if (msg.type === 'pos' && !isRoomHost) {
+        if (game.orbe) {
+          game.orbe._targetX = msg.ox;
+          game.orbe._targetY = msg.oy;
+          if (DIRS[msg.od]) game.orbe.dir = DIRS[msg.od];
+          game.orbe.abilityActiveTimer = msg.oa;
+        }
+        if (msg.ghosts && game.ghosts) {
+          msg.ghosts.forEach(gh => {
+            const localGhost = game.ghosts[gh.id];
+            if (localGhost) {
+              localGhost._targetX = gh.x;
+              localGhost._targetY = gh.y;
+              if (DIRS[gh.d]) localGhost.dir = DIRS[gh.d];
+              localGhost.abilityActiveTimer = gh.a;
+            }
+          });
+        }
+        game.eclipseTimer = msg.e;
+        game.lives = msg.l;
+        game.score = msg.s;
+        if (msg.rx >= 0) {
+          game.relic = { x: msg.rx, y: msg.ry, timer: 9.0 };
+        } else {
+          game.relic = null;
+        }
+        updateHud();
+      } else if (msg.type === 'eat' && !isRoomHost) {
+        if (game.grid && game.grid[msg.y]) {
+          game.grid[msg.y][msg.x] = msg.tile;
+        }
+        game.score = msg.score;
+        game.pelletsRemaining = msg.pellets;
+        if (msg.eclipse > 0 && game.eclipseTimer <= 0) {
+          sfx.powerPellet();
+          spawnParticles(msg.x, msg.y, '#38BDF8', 20);
+          showToast('🌑 MODO ECLIPSE! Cace os Espectros!', 'info');
+        } else {
+          sfx.chomp();
+        }
+        game.eclipseTimer = msg.eclipse;
+        updateHud();
+      } else if (msg.type === 'relic_taken' && !isRoomHost) {
+        if (game.relic) spawnParticles(game.relic.x, game.relic.y, '#10B981', 18);
+        game.relic = null;
+        game.score = msg.score;
+        sfx.win();
+        showToast('💎 Relíquia Bônus coletada!', 'success');
+      } else if (msg.type === 'ghost_eaten' && !isRoomHost) {
+        const gh = game.ghosts[msg.id];
+        if (gh) {
+          spawnParticles(gh.x, gh.y, '#38BDF8', 22);
+          gh.x = 9;
+          gh.y = 10;
+          gh.dir = DIRS.UP;
+        }
+        game.score = msg.score;
+        sfx.eatGhost();
+      } else if (msg.type === 'reset_pos' && !isRoomHost) {
+        game.lives = msg.lives;
+        resetPositions();
+        sfx.hit();
+        showToast(`Capturado! Vidas restantes: ${game.lives}`, 'danger');
+      } else if (msg.type === 'round_end' && !isRoomHost) {
+        handleRoundEnd(msg.winnerRole);
+      } else if (msg.type === 'next_round' && !isRoomHost) {
+        game.round = msg.round;
+        initMatch({
+          mode: 'mp_client',
+          localRole: msg.guestRole,
+          stageNum: game.stageNum,
+          maxRounds: game.maxRounds,
+          keepRound: true
+        });
+      }
+    }
+
+    function setupMpConnection(conn) {
+      mpConn = conn;
+
+      conn.on('open', () => {
+        sendMpPacket({
+          type: 'hello',
+          profile: userProfile,
+          hostRole: document.getElementById('mpHostRoleSelect').value,
+          bestOf3: document.getElementById('mpBestOf3').checked,
+          stageNum: selectedStageNum
+        });
+      });
+
+      conn.on('data', handleIncomingMpData);
+
+      conn.on('close', () => {
+        showToast('Conexão com o oponente encerrada.', 'warn');
+        resetMultiplayerUI();
+      });
+    }
+
+    function activateSandboxRoomFallback(code, asHost) {
+      isSandboxMp = true;
+      if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+
+      if ('BroadcastChannel' in window) {
+        localChannel = new BroadcastChannel(`eclipse-maze-${code}`);
+        localChannel.onmessage = (ev) => handleIncomingMpData(ev.data);
+      }
+
+      if (asHost) {
+        openActiveRoomUI(code);
+        document.getElementById('btnSimulateGuest').classList.remove('hidden');
+        showToast(`Sala ${code} ativa (Modo Local/Simulador)!`, 'info');
+      } else {
+        sendMpPacket({
+          type: 'hello',
+          profile: userProfile
+        });
+      }
+    }
+
+    function openActiveRoomUI(code) {
+      document.getElementById('mpIdleBox').classList.add('hidden');
+      document.getElementById('mpActiveBox').classList.remove('hidden');
+      document.getElementById('roomCodeDisplay').textContent = code;
+
+      const hostRole = document.getElementById('mpHostRoleSelect').value;
+      document.getElementById('mpHostRoleBadge').textContent = hostRole === 'orbe' ? '🟡 Orbe' : '👻 Espectro';
+      document.getElementById('mpGuestRoleBadge').textContent = hostRole === 'orbe' ? '👻 Espectro' : '🟡 Orbe';
+    }
+
+    function resetMultiplayerUI() {
+      if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+      if (localChannel) { try { localChannel.close(); } catch (e) {} localChannel = null; }
+      mpConn = null;
+      isSandboxMp = false;
+      document.getElementById('mpIdleBox').classList.remove('hidden');
+      document.getElementById('mpActiveBox').classList.add('hidden');
+      document.getElementById('btnSimulateGuest').classList.add('hidden');
+      document.getElementById('mpGuestPlaceholder').classList.remove('hidden');
+      document.getElementById('mpGuestAvatar').classList.add('hidden');
+      document.getElementById('mpGuestName').textContent = 'Aguardando...';
+      document.getElementById('mpGuestName').classList.replace('text-white', 'text-slate-400');
+      const startBtn = document.getElementById('btnStartMpMatch');
+      startBtn.disabled = true;
+      startBtn.textContent = 'Aguardando Oponente Entrar...';
+    }
+
+    document.getElementById('btnCopyCode').addEventListener('click', () => {
+      copyTextFallback(currentRoomCode);
+    });
+
+    document.getElementById('btnShareLink').addEventListener('click', () => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('room', currentRoomCode);
+      if (navigator.share) {
+        navigator.share({
+          title: 'Labirinto Sombrio: Eclipse — Duelo 1v1',
+          text: `Venha jogar Pac-Man 1v1 comigo! Código da Sala: ${currentRoomCode}`,
+          url: url.toString()
+        }).catch(() => copyTextFallback(url.toString()));
+      } else {
+        copyTextFallback(url.toString());
+      }
+    });
+
+    document.getElementById('inputRoomCode').addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+
+    document.getElementById('inputRoomCode').addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('btnJoinRoom').click();
+      }
+    });
+
+    document.getElementById('btnSimulateGuest').addEventListener('click', () => {
+      handleIncomingMpData({
+        type: 'hello',
+        profile: {
+          nickname: 'Rival (Simulado)',
+          avatar: generatePresetAvatarDataUrl(PRESET_AVATARS[1])
+        }
+      });
+    });
+
+    document.getElementById('btnCreateRoom').addEventListener('click', () => {
+      isRoomHost = true;
+      currentRoomCode = generateRoomCode();
+      const peerId = `eclipse-maze-${currentRoomCode}`;
+
+      const isSandboxed = window.location.protocol === 'about:' ||
+                          window.location.protocol === 'blob:' ||
+                          window.location.hostname === '' ||
+                          typeof Peer === 'undefined';
+
+      if (isSandboxed) {
+        activateSandboxRoomFallback(currentRoomCode, true);
+        return;
+      }
+
+      try {
+        peer = new Peer(peerId);
+        peer.on('open', () => {
+          openActiveRoomUI(currentRoomCode);
+          showToast(`Sala ${currentRoomCode} criada!`, 'success');
+        });
+        peer.on('connection', (conn) => setupMpConnection(conn));
+        peer.on('error', () => {
+          activateSandboxRoomFallback(currentRoomCode, true);
+        });
+      } catch (err) {
+        activateSandboxRoomFallback(currentRoomCode, true);
+      }
+    });
+
+    document.getElementById('btnJoinRoom').addEventListener('click', () => {
+      const code = document.getElementById('inputRoomCode').value.trim().toUpperCase();
+      if (code.length !== 4) {
+        showToast('Digite o código de 4 letras da sala.', 'warn');
+        return;
+      }
+
+      isRoomHost = false;
+      currentRoomCode = code;
+
+      const isSandboxed = window.location.protocol === 'about:' ||
+                          window.location.protocol === 'blob:' ||
+                          window.location.hostname === '' ||
+                          typeof Peer === 'undefined';
+
+      if (isSandboxed) {
+        activateSandboxRoomFallback(code, false);
+        return;
+      }
+
+      try {
+        peer = new Peer();
+        peer.on('open', () => {
+          showToast(`Conectando à sala ${code}...`, 'info');
+          const conn = peer.connect(`eclipse-maze-${code}`, { reliable: true });
+          setupMpConnection(conn);
+        });
+        peer.on('error', () => {
+          activateSandboxRoomFallback(code, false);
+        });
+      } catch (err) {
+        activateSandboxRoomFallback(code, false);
+      }
+    });
+
+    document.getElementById('btnCloseRoom').addEventListener('click', resetMultiplayerUI);
+
+    document.getElementById('btnStartMpMatch').addEventListener('click', () => {
+      const hostRole = document.getElementById('mpHostRoleSelect').value;
+      const guestRole = hostRole === 'orbe' ? 'espectro' : 'orbe';
+      const maxRounds = document.getElementById('mpBestOf3').checked ? 3 : 1;
+
+      sendMpPacket({
+        type: 'start_match',
+        guestRole,
+        stageNum: selectedStageNum,
+        maxRounds
+      });
+
+      initMatch({
+        mode: 'mp_host',
+        localRole: hostRole,
+        stageNum: selectedStageNum,
+        maxRounds
+      });
+    });
+
+    // --------------------------------------------------------------------------
+    // 11. NAVEGAÇÃO ENTRE TELAS E INICIALIZAÇÃO
+    // --------------------------------------------------------------------------
+    function showGameView() {
+      document.getElementById('lobbyView').classList.add('hidden');
+      document.getElementById('gameView').classList.remove('hidden');
+      resizeCanvas();
+    }
+
+    function showLobbyView() {
+      game.active = false;
+      game.paused = true;
+      document.getElementById('gameView').classList.add('hidden');
+      document.getElementById('lobbyView').classList.remove('hidden');
+    }
+
+    let selectedDifficulty = 'tatico';
+    const diffDescriptions = {
+      casual: 'Bots mais lentos e previsíveis',
+      tatico: 'Perseguição + Emboscada',
+      implacavel: 'Cerco coordenado em alta velocidade'
+    };
+
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedDifficulty = btn.dataset.diff;
+        document.getElementById('diffDesc').textContent = diffDescriptions[selectedDifficulty];
+        document.querySelectorAll('.diff-btn').forEach(b => {
+          b.className = 'diff-btn py-2 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10';
+        });
+        btn.className = 'diff-btn py-2 rounded-xl text-xs font-bold border border-sky-400/50 bg-sky-500/20 text-sky-200';
+      });
+    });
+
+    document.getElementById('btnStartSoloOrbe').addEventListener('click', () => {
+      initMatch({ mode: 'solo', localRole: 'orbe', difficulty: selectedDifficulty, stageNum: selectedStageNum });
+    });
+
+    document.getElementById('btnStartSoloEspectro').addEventListener('click', () => {
+      initMatch({ mode: 'solo', localRole: 'espectro', difficulty: selectedDifficulty, stageNum: selectedStageNum });
+    });
+
+    document.getElementById('btnQuitMatch').addEventListener('click', showLobbyView);
+    document.getElementById('btnBackLobby').addEventListener('click', showLobbyView);
+    document.getElementById('btnPlayAgain').addEventListener('click', () => {
+      initMatch({ mode: game.mode, localRole: game.localRole, difficulty: game.difficulty, stageNum: game.stageNum, maxRounds: game.maxRounds });
+    });
+    document.getElementById('btnNextRoundStage').addEventListener('click', () => {
+      const nextSt = Math.min(50, game.stageNum + 1);
+      selectedStageNum = nextSt;
+      updateSelectedStageUI();
+      initMatch({ mode: 'solo', localRole: game.localRole, difficulty: game.difficulty, stageNum: nextSt, keepScore: true });
+    });
+
+    document.getElementById('btnToggleAudio').addEventListener('click', () => {
+      sfx.enabled = !sfx.enabled;
+      document.getElementById('iconSoundOn').classList.toggle('hidden', !sfx.enabled);
+      document.getElementById('iconSoundOff').classList.toggle('hidden', sfx.enabled);
+      showToast(sfx.enabled ? 'Som ativado' : 'Som silenciado', 'info');
+    });
+
+    document.getElementById('btnInstallPwa').addEventListener('click', () => {
+      document.getElementById('pwaModal').classList.remove('hidden');
+    });
+    document.getElementById('btnClosePwaModal').addEventListener('click', () => {
+      document.getElementById('pwaModal').classList.add('hidden');
+    });
+    document.getElementById('btnClosePwaModal2').addEventListener('click', () => {
+      document.getElementById('pwaModal').classList.add('hidden');
+    });
+    document.getElementById('btnTriggerNativeInstall').addEventListener('click', async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt = null;
+        document.getElementById('pwaModal').classList.add('hidden');
+      }
+    });
+
+    window.addEventListener('load', () => {
+      try {
+        document.getElementById('highScoreDisplay').textContent = localStorage.getItem(HIGHSCORE_KEY) || '0';
+      } catch (e) {}
+
+      loadStageProgress();
+      saveStageProgress();
+      updateSelectedStageUI();
+
+      const hasProfile = loadProfile();
+      if (hasProfile) {
+        applyProfileToUI();
+      } else {
+        openProfileModal(true);
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get('room');
+      if (roomParam && roomParam.length === 4) {
+        document.getElementById('inputRoomCode').value = roomParam.toUpperCase();
+        showToast(`Código ${roomParam.toUpperCase()} preenchido! Clique em Entrar.`, 'info');
+      }
+
+      game.lastTime = performance.now();
+      requestAnimationFrame(mainLoop);
+    });
+  </script>
+</body>
+</html>
