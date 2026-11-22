@@ -97,7 +97,7 @@
   <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none flex flex-col items-center gap-2 w-[92%] max-w-md"></div>
 
   <!-- BARRA SUPERIOR FIXA -->
-  <header class="w-full px-3 sm:px-5 py-2.5 flex items-center justify-between border-b border-white/10 bg-black/25 backdrop-blur-md z-30 shrink-0">
+  <header id="mainAppHeader" class="w-full px-3 sm:px-5 py-2.5 flex items-center justify-between border-b border-white/10 bg-black/25 backdrop-blur-md z-30 shrink-0">
     <div class="flex items-center gap-2.5">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
         <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="currentColor">
@@ -373,43 +373,55 @@
     </section>
 
     <!-- ==================== TELA 2: ARENA DE JOGO ==================== -->
-    <section id="gameView" class="hidden w-full h-full flex flex-col items-center justify-between px-2 sm:px-4 py-2">
+    <section id="gameView" class="hidden w-full h-full flex flex-col items-center justify-between p-1 sm:p-2 overflow-hidden select-none">
 
-      <!-- HUD Superior da Partida -->
-      <div class="w-full max-w-2xl flex items-center justify-between gap-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl px-3 py-1.5 shrink-0">
+      <!-- HUD Superior Compacto da Partida com Habilidade Especial Integrada -->
+      <div id="gameHud" class="w-full max-w-5xl flex items-center justify-between gap-1.5 sm:gap-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-2.5 sm:px-4 py-1.5 shrink-0 z-30 shadow-lg">
         <!-- Info Jogador / Pontos -->
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-2 shrink-0">
           <div class="relative">
-            <img id="hudPlayerAvatar" src="" class="w-8 h-8 rounded-full object-cover border border-amber-400" />
-            <span id="hudRoleIcon" class="absolute -bottom-1 -right-1 text-xs">🟡</span>
+            <img id="hudPlayerAvatar" src="" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-amber-400" />
+            <span id="hudRoleIcon" class="absolute -bottom-1 -right-1 text-[10px] sm:text-xs">🟡</span>
           </div>
           <div>
             <div class="flex items-center gap-1.5">
-              <span id="hudRoleLabel" class="text-[11px] font-extrabold uppercase tracking-wider text-amber-400">ORBE</span>
-              <span id="hudRoundBadge" class="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-slate-300">R1</span>
+              <span id="hudRoleLabel" class="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-amber-400">ORBE</span>
+              <span id="hudRoundBadge" class="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-slate-300">R1</span>
             </div>
-            <div class="font-display font-bold text-sm sm:text-base leading-none text-white">
-              <span id="hudScore">0</span> <span class="text-[10px] font-normal text-slate-400">PTS</span>
+            <div class="font-display font-bold text-xs sm:text-sm leading-none text-white">
+              <span id="hudScore">0</span> <span class="text-[9px] font-normal text-slate-400">PTS</span>
             </div>
           </div>
         </div>
 
         <!-- Status Central (Vidas + Eclipse Timer) -->
-        <div class="flex flex-col items-center">
-          <div id="hudLives" class="flex items-center gap-1 text-sm">❤️❤️❤️</div>
-          <div id="hudEclipseBarWrap" class="hidden w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+        <div class="flex flex-col items-center justify-center shrink-0">
+          <div id="hudLives" class="flex items-center gap-0.5 text-xs sm:text-sm">❤️❤️❤️</div>
+          <div id="hudEclipseBarWrap" class="hidden w-16 sm:w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-0.5">
             <div id="hudEclipseBar" class="h-full bg-sky-400 w-full transition-all duration-75"></div>
           </div>
-          <span id="hudStatusText" class="text-[10px] font-semibold text-slate-300 mt-0.5">Colete os cristais</span>
+          <span id="hudStatusText" class="text-[9px] sm:text-[10px] font-semibold text-slate-300">Cristais: 0</span>
         </div>
 
-        <!-- Botões Ação HUD -->
-        <div class="flex items-center gap-1.5">
-          <button id="btnPauseMatch" title="Pausar Partida (Tecla P ou Esc)" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200">
-            ⏸️
+        <!-- Botão Impulso Veloz / Habilidade Especial na Parte Superior -->
+        <button id="btnSpecialAbility" title="Ativar Habilidade Especial (Espaço, Toque Duplo ou Clique)" class="btn-tactile relative overflow-hidden flex items-center justify-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/25 to-sky-500/25 hover:from-amber-500/35 hover:to-sky-500/35 border border-amber-400/50 shadow-md shrink-0 cursor-pointer">
+          <div id="abilityCooldownFill" class="absolute inset-0 bg-amber-400/25 origin-left transition-transform duration-100" style="transform: scaleX(1);"></div>
+          <span id="abilityTitle" class="relative z-10 font-display font-bold text-xs sm:text-sm text-white whitespace-nowrap">⚡ IMPULSO</span>
+          <span id="abilityStatus" class="relative z-10 text-[9px] sm:text-[10px] font-extrabold text-amber-300 hidden sm:inline whitespace-nowrap">PRONTO</span>
+        </button>
+
+        <!-- Botões Ação HUD (Som, Pausa, Sair) -->
+        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <button id="btnHudToggleAudio" title="Som On/Off" class="btn-tactile p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200">
+            <svg id="hudIconSoundOn" class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+            <svg id="hudIconSoundOff" class="w-3.5 h-3.5 sm:w-4 sm:h-4 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+            </svg>
           </button>
-          <button id="btnToggleDpad" title="Mostrar/Ocultar Controles na Tela" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200">
-            🕹️
+          <button id="btnPauseMatch" title="Pausar Partida (Tecla P ou Esc)" class="btn-tactile p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-slate-200">
+            ⏸️
           </button>
           <button id="btnQuitMatch" class="btn-tactile px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-bold text-rose-300">
             Sair
@@ -417,9 +429,9 @@
         </div>
       </div>
 
-      <!-- Container Responsivo do Canvas -->
-      <div id="canvasContainer" class="relative flex-1 w-full max-w-2xl my-1.5 flex items-center justify-center overflow-hidden">
-        <canvas id="gameCanvas" class="rounded-2xl shadow-2xl border border-white/10"></canvas>
+      <!-- Container Responsivo do Canvas (Inteiriço até a borda inferior) -->
+      <div id="canvasContainer" class="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden my-0 p-0 touch-none">
+        <canvas id="gameCanvas" class="rounded-2xl shadow-2xl border border-white/10 block"></canvas>
 
         <!-- Overlay de Contagem / Fim de Rodada -->
         <div id="arenaOverlay" class="hidden absolute inset-0 bg-slate-950/75 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 text-center z-20">
@@ -428,7 +440,7 @@
           </span>
           <h2 id="overlayTitle" class="font-display text-3xl sm:text-4xl font-bold text-white mb-2">3</h2>
           <p id="overlaySubtitle" class="text-xs sm:text-sm text-slate-300 max-w-xs mb-5">
-            Deslize na tela ou use as setas para mover.
+            Deslize em qualquer direção na tela para mover • Toque duplo para Impulso.
           </p>
           <div id="overlayActions" class="hidden flex flex-wrap items-center justify-center gap-3">
             <button id="btnNextRoundStage" class="hidden btn-tactile px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm">
@@ -442,26 +454,6 @@
             </button>
           </div>
         </div>
-      </div>
-
-      <!-- Barra Inferior: Habilidade Especial + D-Pad Mobile -->
-      <div id="mobileControlsBar" class="w-full max-w-2xl flex items-center justify-between gap-3 pb-1 shrink-0">
-        <!-- D-Pad Aprimorado e Responsivo -->
-        <div id="onscreenDpad" class="grid grid-cols-3 gap-1.5 w-36 h-28 shrink-0">
-          <div></div>
-          <button data-dir="UP" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">▲</button>
-          <div></div>
-          <button data-dir="LEFT" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">◀</button>
-          <button data-dir="DOWN" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">▼</button>
-          <button data-dir="RIGHT" class="dpad-btn btn-tactile bg-white/10 hover:bg-white/20 active:bg-amber-500/50 border border-white/20 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md">▶</button>
-        </div>
-
-        <!-- Botão de Habilidade Especial (Impulso / Fase Etérea) -->
-        <button id="btnSpecialAbility" class="btn-tactile flex-1 h-20 rounded-2xl bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-400/40 flex flex-col items-center justify-center px-4 relative overflow-hidden">
-          <div id="abilityCooldownFill" class="absolute inset-0 bg-amber-400/20 origin-left transition-transform duration-100" style="transform: scaleX(1);"></div>
-          <span id="abilityTitle" class="relative z-10 font-display font-bold text-sm sm:text-base text-white">⚡ IMPULSO VELOZ</span>
-          <span id="abilityStatus" class="relative z-10 text-[11px] font-semibold text-amber-300">PRONTO (ESPAÇO / TOQUE)</span>
-        </button>
       </div>
     </section>
   </main>
@@ -1996,23 +1988,23 @@
         document.getElementById('hudStatusText').textContent = `Cristais: ${game.pelletsRemaining}`;
       }
 
-      // Botão de Habilidade Especial
+      // Botão de Habilidade Especial no Topo
       const actor = isOrbe ? game.orbe : game.ghosts[0];
       if (actor) {
         const titleEl = document.getElementById('abilityTitle');
         const statusEl = document.getElementById('abilityStatus');
         const fillEl = document.getElementById('abilityCooldownFill');
 
-        titleEl.textContent = isOrbe ? '⚡ IMPULSO VELOZ' : '🌀 FASE ETÉREA (ATRAVESSAR)';
+        titleEl.textContent = isOrbe ? '⚡ IMPULSO' : '🌀 ETÉREO';
         if (actor.abilityActiveTimer > 0) {
-          statusEl.textContent = `ATIVO (${actor.abilityActiveTimer.toFixed(1)}s)`;
+          statusEl.textContent = `${actor.abilityActiveTimer.toFixed(1)}s`;
           fillEl.style.transform = 'scaleX(1)';
         } else if (actor.abilityCooldown > 0) {
-          statusEl.textContent = `RECARREGANDO (${actor.abilityCooldown.toFixed(1)}s)`;
+          statusEl.textContent = `${actor.abilityCooldown.toFixed(1)}s`;
           const ratio = 1 - (actor.abilityCooldown / actor.abilityMaxCooldown);
           fillEl.style.transform = `scaleX(${Math.max(0, Math.min(1, ratio))})`;
         } else {
-          statusEl.textContent = 'PRONTO (ESPAÇO / TOQUE)';
+          statusEl.textContent = 'PRONTO';
           fillEl.style.transform = 'scaleX(1)';
         }
       }
@@ -2023,6 +2015,7 @@
     // --------------------------------------------------------------------------
     function resizeCanvas() {
       const container = document.getElementById('canvasContainer');
+      if (!container) return;
       const rect = container.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
 
@@ -2034,14 +2027,21 @@
         w = h * aspect;
       }
 
+      // Máximo aproveitamento horizontal e vertical com respiro mínimo
+      w = Math.max(160, Math.floor(w - 4));
+      h = Math.max(180, Math.floor(h - 4));
+
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.style.width = `${Math.floor(w)}px`;
-      canvas.style.height = `${Math.floor(h)}px`;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
     }
 
     window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(resizeCanvas, 120);
+    });
 
     function renderGame(dt) {
       if (!game.active) return;
@@ -2246,45 +2246,57 @@
       else if (k === 'p' || e.key === 'Escape') { e.preventDefault(); togglePauseMatch(); }
     });
 
-    // Swipe direcional fluido no canvas
+    // Controles por Gestos Fluidos na Tela Toda + Toque Duplo para Impulso
     let touchStartX = 0;
     let touchStartY = 0;
-    canvas.addEventListener('touchstart', (e) => {
+    let lastTapTime = 0;
+
+    const gestureArea = document.getElementById('gameView') || canvas;
+
+    gestureArea.addEventListener('touchstart', (e) => {
+      // Ignora toques em botões da barra superior
+      if (e.target.closest('button') || e.target.closest('input')) return;
       if (e.touches.length > 0) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
+
+        // Toque duplo em qualquer lugar ativa o Impulso Veloz / Habilidade Especial
+        const now = performance.now();
+        if (now - lastTapTime < 320) {
+          triggerLocalAbility();
+          lastTapTime = 0;
+        } else {
+          lastTapTime = now;
+        }
       }
     }, { passive: true });
 
-    canvas.addEventListener('touchmove', (e) => {
+    gestureArea.addEventListener('touchmove', (e) => {
+      if (e.target.closest('button')) return;
       if (!touchStartX && !touchStartY) return;
       const dx = e.touches[0].clientX - touchStartX;
       const dy = e.touches[0].clientY - touchStartY;
-      if (Math.hypot(dx, dy) > 22) {
+      if (Math.hypot(dx, dy) > 16) {
         if (Math.abs(dx) > Math.abs(dy)) {
           setPlayerDirection(dx > 0 ? 'RIGHT' : 'LEFT');
         } else {
           setPlayerDirection(dy > 0 ? 'DOWN' : 'UP');
         }
+        // Reseta ponto inicial permitindo encadear curvas contínuas com o dedo
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
       }
     }, { passive: true });
 
-    document.querySelectorAll('.dpad-btn').forEach(btn => {
-      btn.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        setPlayerDirection(btn.dataset.dir);
-      });
-    });
+    gestureArea.addEventListener('touchend', () => {
+      touchStartX = 0;
+      touchStartY = 0;
+    }, { passive: true });
 
+    // Botão de Habilidade Superior (Impulso Veloz / Fase Etérea)
     document.getElementById('btnSpecialAbility').addEventListener('pointerdown', (e) => {
       e.preventDefault();
       triggerLocalAbility();
-    });
-
-    document.getElementById('btnToggleDpad').addEventListener('click', () => {
-      document.getElementById('onscreenDpad').classList.toggle('hidden');
     });
 
     // --------------------------------------------------------------------------
@@ -2661,16 +2673,33 @@
     // 11. NAVEGAÇÃO ENTRE TELAS E INICIALIZAÇÃO
     // --------------------------------------------------------------------------
     function showGameView() {
+      const header = document.getElementById('mainAppHeader');
+      if (header) header.classList.add('hidden');
       document.getElementById('lobbyView').classList.add('hidden');
       document.getElementById('gameView').classList.remove('hidden');
+      syncAudioUI();
       resizeCanvas();
     }
 
     function showLobbyView() {
       game.active = false;
       game.paused = true;
+      const header = document.getElementById('mainAppHeader');
+      if (header) header.classList.remove('hidden');
       document.getElementById('gameView').classList.add('hidden');
       document.getElementById('lobbyView').classList.remove('hidden');
+      syncAudioUI();
+    }
+
+    function syncAudioUI() {
+      const on1 = document.getElementById('iconSoundOn');
+      const off1 = document.getElementById('iconSoundOff');
+      const on2 = document.getElementById('hudIconSoundOn');
+      const off2 = document.getElementById('hudIconSoundOff');
+      if (on1) on1.classList.toggle('hidden', !sfx.enabled);
+      if (off1) off1.classList.toggle('hidden', sfx.enabled);
+      if (on2) on2.classList.toggle('hidden', !sfx.enabled);
+      if (off2) off2.classList.toggle('hidden', sfx.enabled);
     }
 
     let selectedDifficulty = 'tatico';
@@ -2713,10 +2742,18 @@
 
     document.getElementById('btnToggleAudio').addEventListener('click', () => {
       sfx.enabled = !sfx.enabled;
-      document.getElementById('iconSoundOn').classList.toggle('hidden', !sfx.enabled);
-      document.getElementById('iconSoundOff').classList.toggle('hidden', sfx.enabled);
+      syncAudioUI();
       showToast(sfx.enabled ? 'Som ativado' : 'Som silenciado', 'info');
     });
+
+    const hudAudioBtn = document.getElementById('btnHudToggleAudio');
+    if (hudAudioBtn) {
+      hudAudioBtn.addEventListener('click', () => {
+        sfx.enabled = !sfx.enabled;
+        syncAudioUI();
+        showToast(sfx.enabled ? 'Som ativado' : 'Som silenciado', 'info');
+      });
+    }
 
     document.getElementById('btnInstallPwa').addEventListener('click', () => {
       document.getElementById('pwaModal').classList.remove('hidden');
