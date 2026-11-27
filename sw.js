@@ -1,5 +1,5 @@
 // Service Worker para Labirinto Sombrio: Eclipse
-const CACHE_NAME = 'eclipse-maze-v3';
+const CACHE_NAME = 'eclipse-maze-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -31,6 +31,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Métricas (GoatCounter): sempre pela rede, nunca no cache.
+  if (/goatcounter\.com|gc\.zgo\.at/.test(event.request.url)) return;
   // Ignora requisições de esquemas não suportados (ex: chrome-extension)
   if (!event.request.url.startsWith('http')) return;
 
